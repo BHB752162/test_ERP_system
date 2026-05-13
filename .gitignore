@@ -1,0 +1,30 @@
+# Java
+target/
+*.class
+*.jar
+*.war
+.settings/
+.project
+.classpath
+.idea/
+*.iml
+*.log
+
+# Node
+node_modules/
+dist/
+.vite/
+*.tsbuildinfo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+
+# Claude
+.claude/settings.json
+.claude/history.jsonl
+.claude/projects/
