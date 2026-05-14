@@ -1,6 +1,8 @@
 package com.erp.module.audit.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.erp.module.audit.dto.AuditLogRespDTO;
 import com.erp.module.audit.entity.OrderAuditLog;
 import com.erp.module.audit.mapper.OrderAuditLogMapper;
@@ -34,6 +36,38 @@ public class AuditLogServiceImpl implements AuditLogService {
                         .eq(OrderAuditLog::getOrderId, orderId)
                         .orderByAsc(OrderAuditLog::getOperatedAt))
                 .stream().map(this::toRespDTO).collect(Collectors.toList());
+    }
+
+    @Override
+    public IPage<AuditLogRespDTO> listAll(int page, int pageSize, String orderNo, String action) {
+        // Resolve order IDs if orderNo is provided
+        List<Long> orderIds = null;
+        if (orderNo != null && !orderNo.isEmpty()) {
+            orderIds = salesOrderMapper.selectList(
+                    new LambdaQueryWrapper<SalesOrder>()
+                            .like(SalesOrder::getOrderNo, orderNo)
+                            .select(SalesOrder::getId))
+                    .stream().map(SalesOrder::getId).collect(Collectors.toList());
+            if (orderIds.isEmpty()) {
+                return new Page<>(page, pageSize);
+            }
+        }
+
+        // Query audit logs
+        Page<OrderAuditLog> pageParam = new Page<>(page, pageSize);
+        LambdaQueryWrapper<OrderAuditLog> wrapper = new LambdaQueryWrapper<>();
+        if (orderIds != null) {
+            wrapper.in(OrderAuditLog::getOrderId, orderIds);
+        }
+        if (action != null && !action.isEmpty()) {
+            wrapper.eq(OrderAuditLog::getAction, action);
+        }
+        wrapper.orderByDesc(OrderAuditLog::getOperatedAt);
+
+        Page<OrderAuditLog> result = orderAuditLogMapper.selectPage(pageParam, wrapper);
+        Page<AuditLogRespDTO> dtoPage = new Page<>(result.getCurrent(), result.getSize(), result.getTotal());
+        dtoPage.setRecords(result.getRecords().stream().map(this::toRespDTO).collect(Collectors.toList()));
+        return dtoPage;
     }
 
     private AuditLogRespDTO toRespDTO(OrderAuditLog log) {

@@ -1,35 +1,62 @@
 <template>
-  <div>
-    <el-card>
+  <div v-loading="loading">
+    <el-card shadow="never">
       <template #header>
-        <div style="display: flex; justify-content: space-between; align-items: center">
-          <span>订单详情 - {{ order.orderNo }}</span>
-          <div>
-            <el-button v-if="order.status === 'DRAFT'" type="primary" size="small" @click="handleSubmit">提交审批</el-button>
-            <el-button v-if="order.status === 'PENDING_APPROVAL' && isManager" type="success" size="small" @click="handleApprove">通过</el-button>
-            <el-button v-if="order.status === 'PENDING_APPROVAL' && isManager" type="warning" size="small" @click="showRejectDialog">驳回</el-button>
-            <el-button v-if="['APPROVED'].includes(order.status)" type="primary" size="small" @click="handleComplete">完成</el-button>
-            <el-button v-if="['DRAFT', 'PENDING_APPROVAL'].includes(order.status)" type="danger" size="small" @click="handleCancel">取消订单</el-button>
-            <el-button @click="$router.back()" size="small">返回</el-button>
+        <div class="flex-between">
+          <div style="display: flex; align-items: center; gap: 12px">
+            <span>订单详情</span>
+            <StatusTag :status="order.status" :map="ORDER_STATUS_MAP" />
+            <span style="color: #909399; font-size: 13px">{{ order.orderNo }}</span>
+          </div>
+          <div style="display: flex; gap: 8px">
+            <el-button v-if="order.status === 'DRAFT'" type="primary" size="small" @click="handleSubmit">
+              <el-icon style="margin-right: 4px"><Upload /></el-icon>提交审批
+            </el-button>
+            <el-button v-if="order.status === 'PENDING_APPROVAL' && isManager" type="success" size="small" @click="handleApprove">
+              <el-icon style="margin-right: 4px"><Select /></el-icon>通过
+            </el-button>
+            <el-button v-if="order.status === 'PENDING_APPROVAL' && isManager" type="warning" size="small" @click="showRejectDialog">
+              <el-icon style="margin-right: 4px"><Close /></el-icon>驳回
+            </el-button>
+            <el-button v-if="['APPROVED'].includes(order.status)" type="primary" size="small" @click="handleComplete">
+              <el-icon style="margin-right: 4px"><Check /></el-icon>完成
+            </el-button>
+            <el-button v-if="['DRAFT', 'PENDING_APPROVAL'].includes(order.status)" type="danger" size="small" @click="handleCancel">
+              <el-icon style="margin-right: 4px"><CircleClose /></el-icon>取消订单
+            </el-button>
+            <el-button @click="$router.back()" size="small">
+              <el-icon style="margin-right: 4px"><ArrowLeft /></el-icon>返回
+            </el-button>
           </div>
         </div>
       </template>
 
       <el-descriptions :column="2" border>
-        <el-descriptions-item label="订单号">{{ order.orderNo }}</el-descriptions-item>
+        <el-descriptions-item label="订单号" min-width="160">{{ order.orderNo }}</el-descriptions-item>
         <el-descriptions-item label="状态">
-          <StatusTag :status="order.status" :map="statusMap" />
+          <StatusTag :status="order.status" :map="ORDER_STATUS_MAP" />
         </el-descriptions-item>
-        <el-descriptions-item label="客户名称">{{ order.customerName }}</el-descriptions-item>
-        <el-descriptions-item label="销售姓名">{{ order.salesPersonName }}</el-descriptions-item>
+        <el-descriptions-item label="客户名称">
+          <el-icon style="margin-right: 4px; vertical-align: middle"><User /></el-icon>
+          {{ order.customerName }}
+        </el-descriptions-item>
+        <el-descriptions-item label="销售姓名">
+          <el-icon style="margin-right: 4px; vertical-align: middle"><Avatar /></el-icon>
+          {{ order.salesPersonName }}
+        </el-descriptions-item>
         <el-descriptions-item label="所用微信号">
-          <span v-if="order.salesWechatAccount">{{ order.salesWechatAccount }}<span v-if="order.salesWechatNickname">({{ order.salesWechatNickname }})</span></span>
-          <span v-else>-</span>
+          <span v-if="order.salesWechatAccount">
+            <el-tag size="small" type="info" effect="plain">
+              {{ order.salesWechatAccount }}
+            </el-tag>
+            <span v-if="order.salesWechatNickname" style="margin-left: 4px; color: #909399">({{ order.salesWechatNickname }})</span>
+          </span>
+          <span v-else style="color: #c0c4cc">-</span>
         </el-descriptions-item>
         <el-descriptions-item label="总金额">¥{{ order.totalAmount }}</el-descriptions-item>
-        <el-descriptions-item label="折扣金额">¥{{ order.discountAmount }}</el-descriptions-item>
+        <el-descriptions-item label="折扣金额">¥{{ order.discountAmount || 0 }}</el-descriptions-item>
         <el-descriptions-item label="最终金额">
-          <strong>¥{{ order.finalAmount }}</strong>
+          <span style="font-size: 16px; font-weight: 700; color: #f56c6c">¥{{ order.finalAmount }}</span>
         </el-descriptions-item>
         <el-descriptions-item label="备注" :span="2">{{ order.remark || '-' }}</el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ order.createdAt }}</el-descriptions-item>
@@ -37,47 +64,54 @@
       </el-descriptions>
     </el-card>
 
-    <el-card style="margin-top: 16px">
+    <el-card shadow="never" style="margin-top: 16px">
       <template #header>
         <span>订单明细</span>
       </template>
       <el-table :data="order.items || []" border stripe size="small">
+        <template #empty>
+          <el-empty description="暂无明细" />
+        </template>
         <el-table-column prop="productName" label="产品名称" min-width="160" />
-        <el-table-column prop="quantity" label="数量" width="80" />
-        <el-table-column prop="unitPrice" label="单价" width="100" align="right">
+        <el-table-column prop="quantity" label="数量" width="80" align="center" />
+        <el-table-column prop="unitPrice" label="单价" width="110" align="right">
           <template #default="{ row }">¥{{ row.unitPrice }}</template>
         </el-table-column>
-        <el-table-column prop="subtotal" label="小计" width="110" align="right">
-          <template #default="{ row }">¥{{ row.subtotal }}</template>
+        <el-table-column prop="subtotal" label="小计" width="120" align="right">
+          <template #default="{ row }">
+            <span style="font-weight: 600">¥{{ row.subtotal }}</span>
+          </template>
         </el-table-column>
       </el-table>
     </el-card>
 
-    <el-card style="margin-top: 16px">
+    <el-card shadow="never" style="margin-top: 16px">
       <template #header>
         <span>审批记录</span>
       </template>
-      <el-timeline>
+      <el-timeline v-if="auditLogs.length">
         <el-timeline-item v-for="log in auditLogs" :key="log.id" :timestamp="log.operatedAt" :type="timelineType(log.action)">
           <div>
             <strong>{{ log.operatorName }}</strong>
-            <StatusTag :status="log.action" :map="actionMap" style="margin-left: 8px" />
+            <StatusTag :status="log.action" :map="ORDER_ACTION_MAP" style="margin-left: 8px" />
           </div>
-          <div v-if="log.comment" style="color: #606266; margin-top: 4px">{{ log.comment }}</div>
+          <div v-if="log.comment" style="color: #606266; margin-top: 6px; background: #f5f7fa; padding: 8px 12px; border-radius: 4px; font-size: 13px">
+            {{ log.comment }}
+          </div>
         </el-timeline-item>
       </el-timeline>
-      <div v-if="!auditLogs.length" style="color: #909399; text-align: center; padding: 20px">暂无审批记录</div>
+      <el-empty v-else description="暂无审批记录" />
     </el-card>
 
     <!-- Reject Dialog -->
-    <el-dialog v-model="rejectDialog.visible" title="驳回订单" width="400px">
+    <el-dialog v-model="rejectDialogVisible" title="驳回订单" width="400px" destroy-on-close>
       <el-form ref="rejectFormRef" :model="rejectForm" :rules="rejectRules">
         <el-form-item label="驳回原因" prop="comment">
-          <el-input v-model="rejectForm.comment" type="textarea" :rows="3" placeholder="请输入驳回原因" />
+          <el-input v-model="rejectForm.comment" type="textarea" :rows="4" placeholder="请输入驳回原因" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="rejectDialog.visible = false">取消</el-button>
+        <el-button @click="rejectDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="rejecting" @click="handleReject">确认驳回</el-button>
       </template>
     </el-dialog>
@@ -90,27 +124,12 @@ import { useRoute } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { getOrder, getAuditLogs, submitOrder, approveOrder, rejectOrder, cancelOrder, completeOrder } from '../../api/order'
 import { useAuthStore } from '../../store/auth'
+import { ORDER_STATUS_MAP, ORDER_ACTION_MAP } from '../../constants'
 import StatusTag from '../../components/StatusTag.vue'
 
 const route = useRoute()
 const auth = useAuthStore()
 const orderId = route.params.id
-
-const statusMap = {
-  DRAFT: { label: '草稿', type: 'info' },
-  PENDING_APPROVAL: { label: '待审批', type: 'warning' },
-  APPROVED: { label: '已通过', type: 'success' },
-  REJECTED: { label: '已驳回', type: 'danger' },
-  COMPLETED: { label: '已完成', type: 'success' },
-  CANCELLED: { label: '已取消', type: 'info' }
-}
-const actionMap = {
-  SUBMIT: { label: '提交审批', type: 'primary' },
-  APPROVE: { label: '通过', type: 'success' },
-  REJECT: { label: '驳回', type: 'danger' },
-  CANCEL: { label: '取消', type: 'info' },
-  COMPLETE: { label: '完成', type: 'success' }
-}
 
 const isManager = computed(() => auth.hasAnyRole(['ADMIN', 'SALES_MANAGER']))
 
@@ -119,7 +138,7 @@ const auditLogs = ref([])
 const loading = ref(false)
 
 // Reject
-const rejectDialog = reactive({ visible: false })
+const rejectDialogVisible = ref(false)
 const rejectForm = reactive({ comment: '' })
 const rejectRules = { comment: [{ required: true, message: '请输入驳回原因', trigger: 'blur' }] }
 const rejectFormRef = ref(null)
@@ -139,26 +158,31 @@ async function fetchData() {
     ])
     order.value = oRes.data
     auditLogs.value = aRes.data || []
-  } finally {
+  } catch { /* handled by interceptor */ }
+  finally {
     loading.value = false
   }
 }
 
 async function handleSubmit() {
-  await submitOrder(orderId)
-  ElMessage.success('已提交审批')
-  fetchData()
+  try {
+    await submitOrder(orderId)
+    ElMessage.success('已提交审批')
+    fetchData()
+  } catch { /* handled by interceptor */ }
 }
 
 async function handleApprove() {
-  await approveOrder(orderId)
-  ElMessage.success('审批通过')
-  fetchData()
+  try {
+    await approveOrder(orderId)
+    ElMessage.success('审批通过')
+    fetchData()
+  } catch { /* handled by interceptor */ }
 }
 
 function showRejectDialog() {
   rejectForm.comment = ''
-  rejectDialog.visible = true
+  rejectDialogVisible.value = true
 }
 
 async function handleReject() {
@@ -168,7 +192,7 @@ async function handleReject() {
   try {
     await rejectOrder(orderId, rejectForm)
     ElMessage.success('已驳回')
-    rejectDialog.visible = false
+    rejectDialogVisible.value = false
     fetchData()
   } finally {
     rejecting.value = false
@@ -176,17 +200,25 @@ async function handleReject() {
 }
 
 async function handleCancel() {
-  await ElMessageBox.confirm('确认取消该订单？', '提示')
-  await cancelOrder(orderId)
-  ElMessage.success('已取消')
-  fetchData()
+  try {
+    await ElMessageBox.confirm('确认取消该订单？', '提示', { type: 'warning' })
+    await cancelOrder(orderId)
+    ElMessage.success('已取消')
+    fetchData()
+  } catch {
+    if (typeof arguments?.[0] !== 'string') return
+  }
 }
 
 async function handleComplete() {
-  await ElMessageBox.confirm('确认完成该订单？', '提示')
-  await completeOrder(orderId)
-  ElMessage.success('已完成')
-  fetchData()
+  try {
+    await ElMessageBox.confirm('确认完成该订单？', '提示', { type: 'success' })
+    await completeOrder(orderId)
+    ElMessage.success('已完成')
+    fetchData()
+  } catch {
+    // cancelled dialog
+  }
 }
 
 onMounted(fetchData)

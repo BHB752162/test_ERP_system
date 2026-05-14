@@ -1,15 +1,18 @@
 <template>
-  <el-aside width="220px" style="background: #304156">
-    <div style="height: 60px; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 18px; font-weight: bold; border-bottom: 1px solid #3a4a5e">
-      电商ERP系统
+  <el-aside width="220px" class="sidebar-container">
+    <div class="sidebar-logo">
+      <div class="sidebar-logo-icon">
+        <el-icon :size="22" color="#fff"><ShoppingCart /></el-icon>
+      </div>
+      <span>电商ERP系统</span>
     </div>
     <el-menu
       :default-active="route.path"
-      background-color="#304156"
+      :default-openeds="openedMenus"
+      background-color="#1f2d3d"
       text-color="#bfcbd9"
       active-text-color="#409eff"
       router
-      style="border-right: none"
     >
       <el-menu-item index="/dashboard">
         <el-icon><Odometer /></el-icon>
@@ -21,8 +24,14 @@
           <el-icon><User /></el-icon>
           <span>顾客管理</span>
         </template>
-        <el-menu-item index="/customers">顾客列表</el-menu-item>
-        <el-menu-item index="/customers/create">新增顾客</el-menu-item>
+        <el-menu-item index="/customers">
+          <el-icon><Menu /></el-icon>
+          <span>顾客列表</span>
+        </el-menu-item>
+        <el-menu-item index="/customers/create">
+          <el-icon><Plus /></el-icon>
+          <span>新增顾客</span>
+        </el-menu-item>
       </el-sub-menu>
 
       <el-sub-menu index="product">
@@ -30,8 +39,14 @@
           <el-icon><Goods /></el-icon>
           <span>产品管理</span>
         </template>
-        <el-menu-item index="/products">产品列表</el-menu-item>
-        <el-menu-item index="/categories">产品分类</el-menu-item>
+        <el-menu-item index="/products">
+          <el-icon><Menu /></el-icon>
+          <span>产品列表</span>
+        </el-menu-item>
+        <el-menu-item index="/categories">
+          <el-icon><FolderOpened /></el-icon>
+          <span>产品分类</span>
+        </el-menu-item>
       </el-sub-menu>
 
       <el-sub-menu index="wechat">
@@ -39,8 +54,14 @@
           <el-icon><ChatDotRound /></el-icon>
           <span>微信号管理</span>
         </template>
-        <el-menu-item index="/wechats">微信号列表</el-menu-item>
-        <el-menu-item index="/bindings">绑定管理</el-menu-item>
+        <el-menu-item index="/wechats">
+          <el-icon><Menu /></el-icon>
+          <span>微信号列表</span>
+        </el-menu-item>
+        <el-menu-item index="/bindings">
+          <el-icon><Link /></el-icon>
+          <span>绑定管理</span>
+        </el-menu-item>
       </el-sub-menu>
 
       <el-sub-menu index="order">
@@ -48,8 +69,14 @@
           <el-icon><List /></el-icon>
           <span>订单管理</span>
         </template>
-        <el-menu-item index="/orders">订单列表</el-menu-item>
-        <el-menu-item index="/orders/create">创建订单</el-menu-item>
+        <el-menu-item index="/orders">
+          <el-icon><Menu /></el-icon>
+          <span>订单列表</span>
+        </el-menu-item>
+        <el-menu-item index="/orders/create">
+          <el-icon><Edit /></el-icon>
+          <span>创建订单</span>
+        </el-menu-item>
       </el-sub-menu>
 
       <el-sub-menu index="audit">
@@ -57,7 +84,10 @@
           <el-icon><DocumentChecked /></el-icon>
           <span>审批管理</span>
         </template>
-        <el-menu-item index="/audit-logs">审批日志</el-menu-item>
+        <el-menu-item index="/audit-logs">
+          <el-icon><Clock /></el-icon>
+          <span>审批日志</span>
+        </el-menu-item>
       </el-sub-menu>
 
       <el-menu-item v-if="auth.hasRole('ADMIN')" index="/users">
@@ -69,9 +99,20 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useAuthStore } from '../store/auth'
 
 const route = useRoute()
 const auth = useAuthStore()
+
+const openedMenus = computed(() => {
+  const path = route.path
+  if (path.startsWith('/customers')) return ['customer']
+  if (path.startsWith('/products') || path.startsWith('/categories')) return ['product']
+  if (path.startsWith('/wechats') || path.startsWith('/bindings')) return ['wechat']
+  if (path.startsWith('/orders')) return ['order']
+  if (path.startsWith('/audit')) return ['audit']
+  return []
+})
 </script>

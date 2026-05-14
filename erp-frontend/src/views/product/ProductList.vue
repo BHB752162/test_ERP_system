@@ -1,22 +1,28 @@
 <template>
   <div>
-    <el-card>
+    <el-card shadow="never" class="search-card">
       <el-form :model="query" inline>
         <el-form-item label="产品名称">
           <el-input v-model="query.keyword" placeholder="名称/SKU" clearable @keyup.enter="search" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="search">查询</el-button>
+          <el-button type="primary" @click="search" :loading="loading">查询</el-button>
           <el-button @click="reset">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
-    <el-card style="margin-top: 16px">
-      <div style="margin-bottom: 16px">
-        <el-button type="primary" @click="$router.push('/products/create')">新增产品</el-button>
+    <el-card shadow="never" style="margin-top: 16px">
+      <div class="table-actions">
+        <span></span>
+        <el-button type="primary" @click="$router.push('/products/create')">
+          <el-icon style="margin-right: 4px"><Plus /></el-icon> 新增产品
+        </el-button>
       </div>
       <el-table :data="list" border stripe v-loading="loading">
+        <template #empty>
+          <el-empty :description="query.keyword ? '没有找到匹配的产品' : '暂无产品数据'" />
+        </template>
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="productCode" label="SKU" width="120" />
         <el-table-column prop="productName" label="产品名称" min-width="140" />
@@ -27,7 +33,7 @@
         <el-table-column prop="stockQuantity" label="库存" width="80" align="right" />
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
-            <StatusTag :status="row.status" :map="statusMap" />
+            <StatusTag :status="row.status" :map="ENABLE_STATUS_MAP" />
           </template>
         </el-table-column>
         <el-table-column label="操作" width="180" fixed="right">
@@ -49,39 +55,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { onMounted } from 'vue'
 import { listProducts, deleteProduct } from '../../api/product'
+import { useCrudList, useDeleteAction } from '../../composables/useCrudList'
+import { ENABLE_STATUS_MAP } from '../../constants'
 import Pagination from '../../components/Pagination.vue'
 import StatusTag from '../../components/StatusTag.vue'
 
-const statusMap = { 0: { label: '下架', type: 'danger' }, 1: { label: '上架', type: 'success' } }
-
-const list = ref([])
-const total = ref(0)
-const loading = ref(false)
-const query = reactive({ keyword: '', page: 1, pageSize: 10 })
-
-async function fetchData() {
-  loading.value = true
-  try {
-    const res = await listProducts(query)
-    list.value = res.data.records
-    total.value = res.data.total
-  } finally {
-    loading.value = false
-  }
-}
-
-function search() { query.page = 1; fetchData() }
-function reset() { query.keyword = ''; query.page = 1; fetchData() }
-function onPageChange(page, pageSize) { query.page = page; query.pageSize = pageSize; fetchData() }
-
-async function handleDelete(id) {
-  await deleteProduct(id)
-  ElMessage.success('删除成功')
-  fetchData()
-}
+const { list, total, loading, query, fetchData, search, reset, onPageChange } = useCrudList(listProducts, { defaultQuery: { keyword: '' } })
+const { handleDelete } = useDeleteAction(deleteProduct, fetchData)
 
 onMounted(fetchData)
 </script>

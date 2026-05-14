@@ -1,9 +1,9 @@
 <template>
-  <el-card>
+  <el-card shadow="never">
     <template #header>
       <span>{{ isEdit ? '编辑产品' : '新增产品' }}</span>
     </template>
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 600px">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="120px" style="max-width: 600px" v-loading="loading">
       <el-form-item label="产品名称" prop="productName">
         <el-input v-model="form.productName" />
       </el-form-item>
@@ -16,7 +16,7 @@
         </el-select>
       </el-form-item>
       <el-form-item label="销售单价" prop="price">
-        <el-input-number v-model="form.price" :precision="2" :min="0" style="width: 100%" />
+        <el-input-number v-model="form.price" :precision="2" :min="0" :min-strictly="true" style="width: 100%" />
       </el-form-item>
       <el-form-item label="成本价" prop="costPrice">
         <el-input-number v-model="form.costPrice" :precision="2" :min="0" style="width: 100%" />
@@ -48,6 +48,7 @@ const route = useRoute()
 const router = useRouter()
 const formRef = ref(null)
 const submitting = ref(false)
+const loading = ref(false)
 const categories = ref([])
 const isEdit = computed(() => !!route.params.id)
 
@@ -59,16 +60,21 @@ const form = reactive({
 
 const rules = {
   productName: [{ required: true, message: '请输入产品名称', trigger: 'blur' }],
-  productCode: [{ required: true, message: '请输入SKU编号', trigger: 'blur' }]
+  productCode: [{ required: true, message: '请输入SKU编号', trigger: 'blur' }],
+  price: [{ required: true, message: '请输入销售单价', trigger: 'blur' }],
 }
 
 onMounted(async () => {
-  const catRes = await listCategories()
-  categories.value = catRes.data
-  if (isEdit.value) {
-    const res = await getProduct(route.params.id)
-    Object.assign(form, res.data)
-  }
+  try {
+    const [catRes, prodRes] = isEdit.value
+      ? await Promise.all([listCategories(), getProduct(route.params.id)])
+      : await Promise.all([listCategories()])
+
+    categories.value = catRes.data
+    if (isEdit.value) {
+      Object.assign(form, prodRes.data)
+    }
+  } catch { /* handled by interceptor */ }
 })
 
 async function handleSubmit() {
@@ -84,7 +90,8 @@ async function handleSubmit() {
       ElMessage.success('创建成功')
     }
     router.push('/products')
-  } finally {
+  } catch { /* handled by interceptor */ }
+  finally {
     submitting.value = false
   }
 }

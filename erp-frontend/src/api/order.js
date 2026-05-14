@@ -40,6 +40,10 @@ export function getAuditLogs(orderId) {
   return request.get(`/orders/${orderId}/audit-logs`)
 }
 
+export function listAuditLogs(params) {
+  return request.get('/audit-logs', { params })
+}
+
 export function listProductsForOrder() {
   return request.get('/orders/product-list')
 }

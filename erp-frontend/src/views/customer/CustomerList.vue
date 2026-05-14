@@ -1,34 +1,40 @@
 <template>
   <div>
-    <el-card>
+    <el-card shadow="never" class="search-card">
       <el-form :model="query" inline>
         <el-form-item label="客户名称">
           <el-input v-model="query.keyword" placeholder="名称/电话/邮箱" clearable @keyup.enter="search" />
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="search">查询</el-button>
+          <el-button type="primary" @click="search" :loading="loading">查询</el-button>
           <el-button @click="reset">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
-    <el-card style="margin-top: 16px">
-      <div style="margin-bottom: 16px">
-        <el-button type="primary" @click="$router.push('/customers/create')">新增顾客</el-button>
+    <el-card shadow="never" style="margin-top: 16px">
+      <div class="table-actions">
+        <span></span>
+        <el-button type="primary" @click="$router.push('/customers/create')">
+          <el-icon style="margin-right: 4px"><Plus /></el-icon> 新增顾客
+        </el-button>
       </div>
       <el-table :data="list" border stripe v-loading="loading">
+        <template #empty>
+          <el-empty :description="query.keyword ? '没有找到匹配的客户' : '暂无客户数据'" />
+        </template>
         <el-table-column prop="id" label="ID" width="70" />
         <el-table-column prop="customerName" label="客户名称" min-width="140" />
         <el-table-column prop="phone" label="电话" width="130" />
         <el-table-column prop="email" label="邮箱" width="160" />
         <el-table-column prop="level" label="等级" width="80">
           <template #default="{ row }">
-            <StatusTag :status="row.level" :map="levelMap" />
+            <StatusTag :status="row.level" :map="CUSTOMER_LEVEL_MAP" />
           </template>
         </el-table-column>
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
-            <StatusTag :status="row.status" :map="statusMap" />
+            <StatusTag :status="row.status" :map="ENABLE_STATUS_MAP" />
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="160" />
@@ -52,40 +58,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
+import { onMounted } from 'vue'
 import { listCustomers, deleteCustomer } from '../../api/customer'
+import { useCrudList, useDeleteAction } from '../../composables/useCrudList'
+import { ENABLE_STATUS_MAP, CUSTOMER_LEVEL_MAP } from '../../constants'
 import Pagination from '../../components/Pagination.vue'
 import StatusTag from '../../components/StatusTag.vue'
 
-const levelMap = { 0: { label: '普通', type: 'info' }, 1: { label: '银卡', type: 'success' }, 2: { label: '金卡', type: 'warning' }, 3: { label: '钻石', type: 'danger' } }
-const statusMap = { 0: { label: '停用', type: 'danger' }, 1: { label: '启用', type: 'success' } }
-
-const list = ref([])
-const total = ref(0)
-const loading = ref(false)
-const query = reactive({ keyword: '', page: 1, pageSize: 10 })
-
-async function fetchData() {
-  loading.value = true
-  try {
-    const res = await listCustomers(query)
-    list.value = res.data.records
-    total.value = res.data.total
-  } finally {
-    loading.value = false
-  }
-}
-
-function search() { query.page = 1; fetchData() }
-function reset() { query.keyword = ''; query.page = 1; fetchData() }
-function onPageChange(page, pageSize) { query.page = page; query.pageSize = pageSize; fetchData() }
-
-async function handleDelete(id) {
-  await deleteCustomer(id)
-  ElMessage.success('删除成功')
-  fetchData()
-}
+const { list, total, loading, query, fetchData, search, reset, onPageChange } = useCrudList(listCustomers, { defaultQuery: { keyword: '' } })
+const { handleDelete } = useDeleteAction(deleteCustomer, fetchData)
 
 onMounted(fetchData)
 </script>

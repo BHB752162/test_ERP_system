@@ -1,5 +1,5 @@
 <template>
-  <el-card>
+  <el-card shadow="never">
     <template #header>
       <div style="display: flex; justify-content: space-between; align-items: center">
         <span>产品分类</span>
@@ -7,12 +7,15 @@
       </div>
     </template>
     <el-table :data="categories" border stripe v-loading="loading" row-key="id" default-expand-all>
+      <template #empty>
+        <el-empty description="暂无分类数据" />
+      </template>
       <el-table-column prop="id" label="ID" width="60" />
       <el-table-column prop="categoryName" label="分类名称" min-width="180" />
       <el-table-column prop="sortOrder" label="排序" width="70" />
       <el-table-column prop="status" label="状态" width="70">
         <template #default="{ row }">
-          <StatusTag :status="row.status" :map="statusMap" />
+          <StatusTag :status="row.status" :map="ENABLE_STATUS_MAP" />
         </template>
       </el-table-column>
       <el-table-column label="操作" width="180" fixed="right">
@@ -28,23 +31,23 @@
     </el-table>
 
     <!-- Dialog -->
-    <el-dialog v-model="dialog.visible" :title="dialog.isEdit ? '编辑分类' : '新增分类'" width="450px">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+    <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑分类' : '新增分类'" width="450px" @close="closeDialog">
+      <el-form ref="formRef" :model="formData" :rules="rules" label-width="100px">
         <el-form-item label="分类名称" prop="categoryName">
-          <el-input v-model="form.categoryName" />
+          <el-input v-model="formData.categoryName" />
         </el-form-item>
         <el-form-item label="父分类">
-          <el-tree-select v-model="form.parentId" :data="categories" :props="{ label: 'categoryName', value: 'id' }" placeholder="不选则为顶级分类" clearable filterable style="width: 100%" />
+          <el-tree-select v-model="formData.parentId" :data="categories" :props="{ label: 'categoryName', value: 'id' }" placeholder="不选则为顶级分类" clearable filterable style="width: 100%" />
         </el-form-item>
         <el-form-item label="排序号" prop="sortOrder">
-          <el-input-number v-model="form.sortOrder" :min="0" style="width: 100%" />
+          <el-input-number v-model="formData.sortOrder" :min="0" style="width: 100%" />
         </el-form-item>
         <el-form-item label="状态">
-          <el-switch v-model="form.status" :active-value="1" :inactive-value="0" />
+          <el-switch v-model="formData.status" :active-value="1" :inactive-value="0" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="dialog.visible = false">取消</el-button>
+        <el-button @click="dialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitting" @click="handleSubmit">保存</el-button>
       </template>
     </el-dialog>
@@ -53,18 +56,20 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import { listCategories, createCategory, updateCategory, deleteCategory } from '../../api/product'
+import { ENABLE_STATUS_MAP } from '../../constants'
 import StatusTag from '../../components/StatusTag.vue'
-
-const statusMap = { 0: { label: '停用', type: 'danger' }, 1: { label: '启用', type: 'success' } }
 
 const categories = ref([])
 const loading = ref(false)
 const submitting = ref(false)
 const formRef = ref(null)
-const dialog = reactive({ visible: false, isEdit: false, editId: null })
-const form = reactive({ categoryName: '', parentId: null, sortOrder: 0, status: 1 })
+const dialogVisible = ref(false)
+const isEdit = ref(false)
+const editId = ref(null)
+
+const defaultForm = { categoryName: '', parentId: null, sortOrder: 0, status: 1 }
+const formData = reactive({ ...defaultForm })
 const rules = { categoryName: [{ required: true, message: '请输入名称', trigger: 'blur' }] }
 
 async function fetchData() {
@@ -78,11 +83,16 @@ async function fetchData() {
 }
 
 function showDialog(row) {
-  dialog.isEdit = !!row
-  dialog.editId = row?.id || null
-  if (row) Object.assign(form, row)
-  else Object.assign(form, { categoryName: '', parentId: null, sortOrder: 0, status: 1 })
-  dialog.visible = true
+  isEdit.value = !!row
+  editId.value = row?.id || null
+  if (row) Object.assign(formData, row)
+  else Object.assign(formData, { ...defaultForm })
+  dialogVisible.value = true
+}
+
+function closeDialog() {
+  dialogVisible.value = false
+  formRef.value?.resetFields()
 }
 
 async function handleSubmit() {
@@ -90,14 +100,12 @@ async function handleSubmit() {
   if (!valid) return
   submitting.value = true
   try {
-    if (dialog.isEdit) {
-      await updateCategory(dialog.editId, form)
-      ElMessage.success('更新成功')
+    if (isEdit.value) {
+      await updateCategory(editId.value, formData)
     } else {
-      await createCategory(form)
-      ElMessage.success('创建成功')
+      await createCategory(formData)
     }
-    dialog.visible = false
+    closeDialog()
     fetchData()
   } finally {
     submitting.value = false
@@ -105,9 +113,10 @@ async function handleSubmit() {
 }
 
 async function handleDelete(id) {
-  await deleteCategory(id)
-  ElMessage.success('删除成功')
-  fetchData()
+  try {
+    await deleteCategory(id)
+    fetchData()
+  } catch { /* handled by interceptor */ }
 }
 
 onMounted(fetchData)

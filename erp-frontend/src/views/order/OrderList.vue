@@ -1,27 +1,33 @@
 <template>
   <div>
-    <el-card>
+    <el-card shadow="never" class="search-card">
       <el-form :model="query" inline>
         <el-form-item label="订单号">
           <el-input v-model="query.keyword" placeholder="订单号/客户名" clearable @keyup.enter="search" />
         </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="query.status" placeholder="全部" clearable style="width: 140px" @change="search">
-            <el-option v-for="(v, k) in statusMap" :key="k" :value="k" :label="v.label" />
+            <el-option v-for="(v, k) in ORDER_STATUS_MAP" :key="k" :value="k" :label="v.label" />
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="search">查询</el-button>
+          <el-button type="primary" @click="search" :loading="loading">查询</el-button>
           <el-button @click="reset">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
-    <el-card style="margin-top: 16px">
-      <div style="margin-bottom: 16px">
-        <el-button type="primary" @click="$router.push('/orders/create')">创建订单</el-button>
+    <el-card shadow="never" style="margin-top: 16px">
+      <div class="table-actions">
+        <span></span>
+        <el-button type="primary" @click="$router.push('/orders/create')">
+          <el-icon style="margin-right: 4px"><Plus /></el-icon> 创建订单
+        </el-button>
       </div>
       <el-table :data="list" border stripe v-loading="loading">
+        <template #empty>
+          <el-empty :description="query.keyword || query.status ? '没有找到匹配的订单' : '暂无订单数据'" />
+        </template>
         <el-table-column prop="orderNo" label="订单号" width="170" />
         <el-table-column prop="customerName" label="客户" width="120" />
         <el-table-column prop="salesPersonName" label="销售" width="100" />
@@ -36,7 +42,7 @@
         </el-table-column>
         <el-table-column prop="status" label="状态" width="120">
           <template #default="{ row }">
-            <StatusTag :status="row.status" :map="statusMap" />
+            <StatusTag :status="row.status" :map="ORDER_STATUS_MAP" />
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="160" />
@@ -54,39 +60,16 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { onMounted } from 'vue'
 import { listOrders } from '../../api/order'
+import { useCrudList } from '../../composables/useCrudList'
+import { ORDER_STATUS_MAP } from '../../constants'
 import Pagination from '../../components/Pagination.vue'
 import StatusTag from '../../components/StatusTag.vue'
 
-const statusMap = {
-  DRAFT: { label: '草稿', type: 'info' },
-  PENDING_APPROVAL: { label: '待审批', type: 'warning' },
-  APPROVED: { label: '已通过', type: 'success' },
-  REJECTED: { label: '已驳回', type: 'danger' },
-  COMPLETED: { label: '已完成', type: 'success' },
-  CANCELLED: { label: '已取消', type: 'info' }
-}
-
-const list = ref([])
-const total = ref(0)
-const loading = ref(false)
-const query = reactive({ keyword: '', status: '', page: 1, pageSize: 10 })
-
-async function fetchData() {
-  loading.value = true
-  try {
-    const res = await listOrders(query)
-    list.value = res.data.records
-    total.value = res.data.total
-  } finally {
-    loading.value = false
-  }
-}
-
-function search() { query.page = 1; fetchData() }
-function reset() { query.keyword = ''; query.status = ''; query.page = 1; fetchData() }
-function onPageChange(page, pageSize) { query.page = page; query.pageSize = pageSize; fetchData() }
+const { list, total, loading, query, fetchData, search, reset, onPageChange } = useCrudList(listOrders, {
+  defaultQuery: { keyword: '', status: '' }
+})
 
 onMounted(fetchData)
 </script>

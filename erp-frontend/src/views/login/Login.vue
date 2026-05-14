@@ -1,23 +1,42 @@
 <template>
-  <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%)">
-    <el-card style="width: 420px; padding: 20px" shadow="always">
-      <h2 style="text-align: center; margin-bottom: 30px; color: #303133">电商ERP系统</h2>
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="0" @keyup.enter="handleLogin">
-        <el-form-item prop="username">
-          <el-input v-model="form.username" placeholder="用户名" size="large" prefix-icon="User" />
-        </el-form-item>
-        <el-form-item prop="password">
-          <el-input v-model="form.password" type="password" placeholder="密码" size="large" prefix-icon="Lock" show-password />
-        </el-form-item>
-        <el-form-item>
-          <el-button type="primary" size="large" style="width: 100%" :loading="loading" @click="handleLogin">
-            登 录
-          </el-button>
-        </el-form-item>
-        <div style="text-align: center; color: #909399; font-size: 12px">
-          默认管理员: admin / admin123
+  <div class="login-page">
+    <div class="bg-circles">
+      <span /><span /><span /><span />
+    </div>
+    <el-card shadow="never" class="login-card">
+      <div class="login-header">
+        <div class="login-logo">
+          <el-icon :size="28" color="#fff"><ShoppingCart /></el-icon>
         </div>
-      </el-form>
+        <h2>电商ERP系统</h2>
+        <p>登录您的账户以继续</p>
+      </div>
+      <div class="login-body">
+        <el-form ref="formRef" :model="form" :rules="rules" label-width="0" @keyup.enter="handleLogin">
+          <el-form-item prop="username">
+            <el-input v-model="form.username" placeholder="用户名" size="large" clearable>
+              <template #prefix>
+                <el-icon><User /></el-icon>
+              </template>
+            </el-input>
+          </el-form-item>
+          <el-form-item prop="password">
+            <el-input v-model="form.password" type="password" placeholder="密码" size="large" show-password clearable>
+              <template #prefix>
+                <el-icon><Lock /></el-icon>
+              </template>
+            </el-input>
+          </el-form-item>
+          <el-form-item style="margin-top: 8px">
+            <el-button type="primary" size="large" style="width: 100%; height: 44px; font-size: 15px" :loading="loading" @click="handleLogin">
+              登 录
+            </el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+      <div class="login-footer">
+        默认管理员: admin / admin123
+      </div>
     </el-card>
   </div>
 </template>

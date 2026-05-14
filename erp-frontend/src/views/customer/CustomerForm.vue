@@ -1,14 +1,14 @@
 <template>
-  <el-card>
+  <el-card shadow="never">
     <template #header>
       <span>{{ isEdit ? '编辑顾客' : '新增顾客' }}</span>
     </template>
-    <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" style="max-width: 600px">
+    <el-form ref="formRef" :model="form" :rules="rules" label-width="100px" style="max-width: 600px" v-loading="loading">
       <el-form-item label="客户名称" prop="customerName">
         <el-input v-model="form.customerName" />
       </el-form-item>
       <el-form-item label="联系电话" prop="phone">
-        <el-input v-model="form.phone" />
+        <el-input v-model="form.phone" maxlength="20" />
       </el-form-item>
       <el-form-item label="邮箱" prop="email">
         <el-input v-model="form.email" />
@@ -48,6 +48,7 @@ const route = useRoute()
 const router = useRouter()
 const formRef = ref(null)
 const submitting = ref(false)
+const loading = ref(false)
 const isEdit = computed(() => !!route.params.id)
 
 const form = reactive({
@@ -56,13 +57,24 @@ const form = reactive({
 })
 
 const rules = {
-  customerName: [{ required: true, message: '请输入客户名称', trigger: 'blur' }]
+  customerName: [{ required: true, message: '请输入客户名称', trigger: 'blur' }],
+  phone: [
+    { pattern: /^[\d\-+() ]{7,20}$/, message: '请输入有效的联系电话', trigger: 'blur' }
+  ],
+  email: [
+    { type: 'email', message: '请输入有效的邮箱地址', trigger: 'blur' }
+  ]
 }
 
 onMounted(async () => {
-  if (isEdit.value) {
+  if (!isEdit.value) return
+  loading.value = true
+  try {
     const res = await getCustomer(route.params.id)
     Object.assign(form, res.data)
+  } catch { /* handled by interceptor */ }
+  finally {
+    loading.value = false
   }
 })
 
@@ -79,7 +91,8 @@ async function handleSubmit() {
       ElMessage.success('创建成功')
     }
     router.push('/customers')
-  } finally {
+  } catch { /* handled by interceptor */ }
+  finally {
     submitting.value = false
   }
 }

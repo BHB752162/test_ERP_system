@@ -1,10 +1,14 @@
 <template>
   <el-container style="height: 100vh">
     <Sidebar />
-    <el-container>
+    <el-container style="display: flex; flex-direction: column">
       <Navbar />
-      <el-main style="background: #f5f7fa; padding: 20px">
-        <router-view />
+      <el-main style="background: #f0f2f5; padding: 20px; overflow-y: auto">
+        <router-view v-slot="{ Component }">
+          <transition name="page-fade" mode="out-in">
+            <component :is="Component" />
+          </transition>
+        </router-view>
       </el-main>
     </el-container>
   </el-container>

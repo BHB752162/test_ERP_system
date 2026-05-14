@@ -1,5 +1,5 @@
 <template>
-  <el-card>
+  <el-card shadow="never">
     <template #header>
       <span>创建订单</span>
     </template>
@@ -54,7 +54,7 @@ import { ref, reactive, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
-import { createDraft, listWechatsForOrder, getBoundCustomers, listProductsForOrder } from '../../api/order'
+import { createDraft, submitOrder, listWechatsForOrder, getBoundCustomers, listProductsForOrder } from '../../api/order'
 
 const router = useRouter()
 const formRef = ref(null)
@@ -80,22 +80,23 @@ const totalAmount = computed(() => {
 })
 
 onMounted(async () => {
-  const [wRes, pRes] = await Promise.all([
-    listWechatsForOrder(),
-    listProductsForOrder()
-  ])
-  myWechats.value = wRes.data || []
-  products.value = pRes.data || []
+  try {
+    const [wRes, pRes] = await Promise.all([
+      listWechatsForOrder(),
+      listProductsForOrder()
+    ])
+    myWechats.value = wRes.data || []
+    products.value = pRes.data || []
+  } catch { /* handled by interceptor */ }
 })
 
 async function onWechatChange(wechatId) {
   form.customerId = null
-  if (wechatId) {
+  if (!wechatId) { boundCustomers.value = []; return }
+  try {
     const res = await getBoundCustomers(wechatId)
     boundCustomers.value = res.data || []
-  } else {
-    boundCustomers.value = []
-  }
+  } catch { /* handled by interceptor */ }
 }
 
 function addItem() {
@@ -133,6 +134,11 @@ async function handleSubmit(action) {
     ElMessage.warning('请至少添加一个产品')
     return
   }
+  const missingProduct = form.items.some(item => !item.productId)
+  if (missingProduct) {
+    ElMessage.warning('请为每个明细选择产品')
+    return
+  }
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
   submitting.value = true
@@ -149,15 +155,15 @@ async function handleSubmit(action) {
     }
     const res = await createDraft(data)
     const orderId = res.data?.id
-    if (action === 'SUBMIT') {
-      const { submitOrder } = await import('../../api/order')
+    if (action === 'SUBMIT' && orderId) {
       await submitOrder(orderId)
       ElMessage.success('订单已提交审批')
     } else {
       ElMessage.success('草稿保存成功')
     }
     router.push('/orders')
-  } finally {
+  } catch { /* handled by interceptor */ }
+  finally {
     submitting.value = false
   }
 }

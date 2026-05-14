@@ -1,6 +1,6 @@
 <template>
   <div>
-    <el-card>
+    <el-card shadow="never" class="search-card">
       <el-form :model="query" inline>
         <el-form-item label="微信号">
           <el-select v-model="query.wechatId" placeholder="选择微信号" filterable clearable style="width: 200px" @change="search">
@@ -13,14 +13,23 @@
           </el-select>
         </el-form-item>
         <el-form-item>
-          <el-button type="primary" @click="showCreateDialog">新建绑定</el-button>
+          <el-button type="primary" @click="search">查询</el-button>
           <el-button @click="reset">重置</el-button>
         </el-form-item>
       </el-form>
     </el-card>
 
-    <el-card style="margin-top: 16px">
+    <el-card shadow="never" style="margin-top: 16px">
+      <div class="table-actions">
+        <span></span>
+        <el-button type="primary" @click="showCreateDialog">
+          <el-icon style="margin-right: 4px"><Plus /></el-icon> 新建绑定
+        </el-button>
+      </div>
       <el-table :data="list" border stripe v-loading="loading">
+        <template #empty>
+          <el-empty description="暂无绑定数据" />
+        </template>
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="wechatAccount" label="微信号" width="130" />
         <el-table-column prop="wechatNickname" label="微信昵称" width="120" />
@@ -28,7 +37,7 @@
         <el-table-column prop="customerName" label="顾客名称" min-width="140" />
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
-            <StatusTag :status="row.status" :map="bindStatusMap" />
+            <StatusTag :status="row.status" :map="BINDING_STATUS_MAP" />
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="绑定时间" width="160" />
@@ -48,21 +57,21 @@
     </el-card>
 
     <!-- Create Binding Dialog -->
-    <el-dialog v-model="createDialog.visible" title="新建绑定" width="500px">
-      <el-form ref="formRef" :model="form" :rules="rules" label-width="100px">
+    <el-dialog v-model="createDialogVisible" title="新建绑定" width="500px" @close="closeDialog">
+      <el-form ref="formRef" :model="formData" :rules="rules" label-width="100px">
         <el-form-item label="微信号" prop="salesWechatId">
-          <el-select v-model="form.salesWechatId" placeholder="选择微信号" filterable style="width: 100%">
+          <el-select v-model="formData.salesWechatId" placeholder="选择微信号" filterable style="width: 100%">
             <el-option v-for="w in wechats" :key="w.id" :value="w.id" :label="`${w.wechatAccount}(${w.wechatNickname || ''})`" />
           </el-select>
         </el-form-item>
         <el-form-item label="顾客" prop="customerId">
-          <el-select v-model="form.customerId" placeholder="选择顾客" filterable style="width: 100%">
+          <el-select v-model="formData.customerId" placeholder="选择顾客" filterable style="width: 100%">
             <el-option v-for="c in customers" :key="c.id" :value="c.id" :label="c.customerName" />
           </el-select>
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="createDialog.visible = false">取消</el-button>
+        <el-button @click="createDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="submitting" @click="handleCreate">保存</el-button>
       </template>
     </el-dialog>
@@ -71,60 +80,48 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { ElMessage } from 'element-plus'
 import { listBindings, createBinding, unbind } from '../../api/binding'
 import { listWechats } from '../../api/wechat'
 import { listCustomers } from '../../api/customer'
+import { useCrudList } from '../../composables/useCrudList'
+import { BINDING_STATUS_MAP } from '../../constants'
 import Pagination from '../../components/Pagination.vue'
 import StatusTag from '../../components/StatusTag.vue'
 
-const bindStatusMap = { 0: { label: '解绑', type: 'danger' }, 1: { label: '绑定', type: 'success' } }
+const { list, total, loading, query, fetchData, search, reset, onPageChange } = useCrudList(listBindings, {
+  defaultQuery: { wechatId: null, customerId: null }
+})
 
-const list = ref([])
-const total = ref(0)
-const loading = ref(false)
 const wechats = ref([])
 const customers = ref([])
 const submitting = ref(false)
 const formRef = ref(null)
+const createDialogVisible = ref(false)
 
-const query = reactive({ wechatId: null, customerId: null, page: 1, pageSize: 10 })
-const createDialog = reactive({ visible: false })
-const form = reactive({ salesWechatId: null, customerId: null })
+const formData = reactive({ salesWechatId: null, customerId: null })
 const rules = {
   salesWechatId: [{ required: true, message: '请选择微信号', trigger: 'change' }],
   customerId: [{ required: true, message: '请选择顾客', trigger: 'change' }]
 }
 
-async function fetchData() {
-  loading.value = true
-  try {
-    const res = await listBindings(query)
-    list.value = res.data.records
-    total.value = res.data.total
-  } finally {
-    loading.value = false
-  }
+function showCreateDialog() {
+  formData.salesWechatId = null
+  formData.customerId = null
+  createDialogVisible.value = true
 }
 
-function search() { query.page = 1; fetchData() }
-function reset() { query.wechatId = null; query.customerId = null; query.page = 1; fetchData() }
-function onPageChange(page, pageSize) { query.page = page; query.pageSize = pageSize; fetchData() }
-
-async function showCreateDialog() {
-  form.salesWechatId = null
-  form.customerId = null
-  createDialog.visible = true
+function closeDialog() {
+  createDialogVisible.value = false
+  formRef.value?.resetFields()
 }
 
 async function handleCreate() {
-  const valid = await formRef.value.validate().catch(() => false)
+  const valid = await formRef.value?.validate().catch(() => false)
   if (!valid) return
   submitting.value = true
   try {
-    await createBinding(form)
-    ElMessage.success('绑定成功')
-    createDialog.visible = false
+    await createBinding(formData)
+    createDialogVisible.value = false
     fetchData()
   } finally {
     submitting.value = false
@@ -132,18 +129,21 @@ async function handleCreate() {
 }
 
 async function handleUnbind(id) {
-  await unbind(id)
-  ElMessage.success('解绑成功')
-  fetchData()
+  try {
+    await unbind(id)
+    fetchData()
+  } catch { /* handled by interceptor */ }
 }
 
 onMounted(async () => {
   fetchData()
-  const [wRes, cRes] = await Promise.all([
-    listWechats({ page: 1, pageSize: 999 }),
-    listCustomers({ page: 1, pageSize: 999 })
-  ])
-  wechats.value = wRes.data.records || []
-  customers.value = cRes.data.records || []
+  try {
+    const [wRes, cRes] = await Promise.all([
+      listWechats({ page: 1, pageSize: 200 }),
+      listCustomers({ page: 1, pageSize: 200 })
+    ])
+    wechats.value = wRes.data.records || []
+    customers.value = cRes.data.records || []
+  } catch { /* ignore */ }
 })
 </script>
