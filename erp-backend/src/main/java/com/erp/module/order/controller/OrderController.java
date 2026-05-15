@@ -8,10 +8,14 @@ import com.erp.module.order.dto.OrderRespDTO;
 import com.erp.module.order.entity.SalesOrder;
 import com.erp.module.order.service.OrderService;
 import com.erp.security.SecurityUtils;
+import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.validation.Valid;
+import java.nio.charset.StandardCharsets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 @RestController
 @RequestMapping("/api/orders")
@@ -70,5 +74,24 @@ public class OrderController {
     public ApiResponse<Void> complete(@PathVariable Long id) {
         orderService.completeOrder(id, SecurityUtils.getCurrentUserId());
         return ApiResponse.success();
+    }
+
+    @GetMapping("/export")
+    public ResponseEntity<byte[]> export(
+            @RequestParam(defaultValue = "order") String mode,
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String status) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        String roleCode = SecurityUtils.getCurrentRoleCode();
+        byte[] excelBytes = orderService.exportOrders(mode, keyword, status, userId, roleCode);
+
+        String suffix = "product".equals(mode) ? "by_product" : "by_order";
+        String filename = "orders_" + suffix + "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_OCTET_STREAM);
+        headers.setContentDisposition(ContentDisposition.attachment().filename(filename, StandardCharsets.UTF_8).build());
+
+        return new ResponseEntity<>(excelBytes, headers, HttpStatus.OK);
     }
 }

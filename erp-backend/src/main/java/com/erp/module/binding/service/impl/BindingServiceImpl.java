@@ -1,6 +1,8 @@
 package com.erp.module.binding.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.erp.common.exception.BusinessException;
 import com.erp.module.binding.dto.BindingReqDTO;
 import com.erp.module.binding.dto.BindingRespDTO;
@@ -35,11 +37,18 @@ public class BindingServiceImpl implements BindingService {
     private SysUserMapper sysUserMapper;
 
     @Override
-    public List<BindingRespDTO> listAll(String keyword) {
-        List<CustomerWechatBinding> bindings = bindingMapper.selectList(
-                new LambdaQueryWrapper<CustomerWechatBinding>()
-                        .orderByDesc(CustomerWechatBinding::getCreatedAt));
-        return bindings.stream().map(this::toRespDTO).collect(Collectors.toList());
+    public IPage<BindingRespDTO> listAll(Long wechatId, Long customerId, Integer page, Integer pageSize) {
+        LambdaQueryWrapper<CustomerWechatBinding> wrapper = new LambdaQueryWrapper<CustomerWechatBinding>()
+                .ne(CustomerWechatBinding::getStatus, 0)
+                .orderByDesc(CustomerWechatBinding::getCreatedAt);
+        if (wechatId != null) {
+            wrapper.eq(CustomerWechatBinding::getSalesWechatId, wechatId);
+        }
+        if (customerId != null) {
+            wrapper.eq(CustomerWechatBinding::getCustomerId, customerId);
+        }
+        IPage<CustomerWechatBinding> pageResult = bindingMapper.selectPage(new Page<>(page, pageSize), wrapper);
+        return pageResult.convert(this::toRespDTO);
     }
 
     @Override
@@ -71,6 +80,15 @@ public class BindingServiceImpl implements BindingService {
         List<CustomerWechatBinding> bindings = bindingMapper.selectList(
                 new LambdaQueryWrapper<CustomerWechatBinding>()
                         .eq(CustomerWechatBinding::getSalesWechatId, wechatId)
+                        .eq(CustomerWechatBinding::getStatus, 1));
+        return bindings.stream().map(this::toRespDTO).collect(Collectors.toList());
+    }
+
+    @Override
+    public List<BindingRespDTO> listBoundWechatsByCustomer(Long customerId) {
+        List<CustomerWechatBinding> bindings = bindingMapper.selectList(
+                new LambdaQueryWrapper<CustomerWechatBinding>()
+                        .eq(CustomerWechatBinding::getCustomerId, customerId)
                         .eq(CustomerWechatBinding::getStatus, 1));
         return bindings.stream().map(this::toRespDTO).collect(Collectors.toList());
     }

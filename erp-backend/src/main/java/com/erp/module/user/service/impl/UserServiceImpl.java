@@ -39,7 +39,7 @@ public class UserServiceImpl implements UserService {
                     .or().like(SysUser::getRealName, keyword)
                     .or().like(SysUser::getPhone, keyword);
         }
-        wrapper.orderByDesc(SysUser::getCreatedAt);
+        wrapper.ne(SysUser::getStatus, 0).orderByDesc(SysUser::getCreatedAt);
 
         IPage<SysUser> userPage = sysUserMapper.selectPage(pageParam, wrapper);
         return userPage.convert(this::toRespDTO);
@@ -89,6 +89,14 @@ public class UserServiceImpl implements UserService {
         SysUser user = sysUserMapper.selectById(id);
         if (user == null) throw new BusinessException("用户不存在");
         user.setStatus(status);
+        sysUserMapper.updateById(user);
+    }
+
+    @Override
+    public void deleteUser(Long id) {
+        SysUser user = sysUserMapper.selectById(id);
+        if (user == null) throw new BusinessException("用户不存在");
+        user.setStatus(0);
         sysUserMapper.updateById(user);
     }
 

@@ -1,6 +1,8 @@
 package com.erp.module.wechat.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.erp.common.exception.BusinessException;
 import com.erp.module.user.entity.SysUser;
 import com.erp.module.user.mapper.SysUserMapper;
@@ -9,6 +11,7 @@ import com.erp.module.wechat.dto.WechatRespDTO;
 import com.erp.module.wechat.entity.SalesWechat;
 import com.erp.module.wechat.mapper.SalesWechatMapper;
 import com.erp.module.wechat.service.SalesWechatService;
+import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
@@ -30,6 +33,7 @@ public class SalesWechatServiceImpl implements SalesWechatService {
         return salesWechatMapper.selectList(
                 new LambdaQueryWrapper<SalesWechat>()
                         .eq(SalesWechat::getSalesPersonId, salesPersonId)
+                        .ne(SalesWechat::getStatus, 0)
                         .orderByDesc(SalesWechat::getCreatedAt))
                 .stream().map(this::toRespDTO).collect(Collectors.toList());
     }
@@ -37,6 +41,19 @@ public class SalesWechatServiceImpl implements SalesWechatService {
     @Override
     public List<WechatRespDTO> listMyWechats(Long currentUserId) {
         return listBySalesPerson(currentUserId);
+    }
+
+    @Override
+    public IPage<WechatRespDTO> listAll(String keyword, Integer page, Integer pageSize) {
+        LambdaQueryWrapper<SalesWechat> wrapper = new LambdaQueryWrapper<SalesWechat>()
+                .ne(SalesWechat::getStatus, 0)
+                .orderByDesc(SalesWechat::getCreatedAt);
+        if (StringUtils.isNotBlank(keyword)) {
+            wrapper.and(w -> w.like(SalesWechat::getWechatAccount, keyword)
+                    .or().like(SalesWechat::getWechatNickname, keyword));
+        }
+        IPage<SalesWechat> pageResult = salesWechatMapper.selectPage(new Page<>(page, pageSize), wrapper);
+        return pageResult.convert(this::toRespDTO);
     }
 
     @Override
@@ -64,7 +81,10 @@ public class SalesWechatServiceImpl implements SalesWechatService {
 
     @Override
     public void delete(Long id) {
-        salesWechatMapper.deleteById(id);
+        SalesWechat wechat = salesWechatMapper.selectById(id);
+        if (wechat == null) throw new BusinessException("微信号不存在");
+        wechat.setStatus(0);
+        salesWechatMapper.updateById(wechat);
     }
 
     private WechatRespDTO toRespDTO(SalesWechat wechat) {

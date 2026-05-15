@@ -8,4 +8,5 @@ public class RoleRespDTO {
     private String roleName;
     private String roleCode;
     private String description;
+    private Integer status;
 }

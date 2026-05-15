@@ -30,6 +30,7 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
     public List<ProductCategoryRespDTO> listTree() {
         List<ProductCategory> all = productCategoryMapper.selectList(
                 new LambdaQueryWrapper<ProductCategory>()
+                        .ne(ProductCategory::getStatus, 0)
                         .orderByAsc(ProductCategory::getSortOrder));
 
         Map<Long, List<ProductCategory>> parentMap = all.stream()
@@ -82,6 +83,9 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
                         .eq(com.erp.module.product.entity.Product::getCategoryId, id));
         if (productCount > 0) throw new BusinessException("该分类下有产品，无法删除");
 
-        productCategoryMapper.deleteById(id);
+        ProductCategory category = productCategoryMapper.selectById(id);
+        if (category == null) throw new BusinessException("分类不存在");
+        category.setStatus(0);
+        productCategoryMapper.updateById(category);
     }
 }

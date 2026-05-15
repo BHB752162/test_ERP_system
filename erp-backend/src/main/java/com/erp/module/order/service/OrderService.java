@@ -14,4 +14,5 @@ public interface OrderService {
     void rejectOrder(Long orderId, Long currentUserId, String comment);
     void cancelOrder(Long orderId, Long currentUserId);
     void completeOrder(Long orderId, Long currentUserId);
+    byte[] exportOrders(String mode, String keyword, String status, Long currentUserId, String roleCode);
 }

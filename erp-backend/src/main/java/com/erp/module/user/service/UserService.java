@@ -10,4 +10,5 @@ public interface UserService {
     void createUser(UserReqDTO req);
     void updateUser(Long id, UserReqDTO req);
     void updateStatus(Long id, Integer status);
+    void deleteUser(Long id);
 }

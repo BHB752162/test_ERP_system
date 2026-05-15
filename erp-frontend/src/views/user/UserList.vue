@@ -24,18 +24,18 @@
           <el-empty :description="query.keyword ? '没有找到匹配的用户' : '暂无用户数据'" />
         </template>
         <el-table-column prop="id" label="ID" width="60" />
-        <el-table-column prop="username" label="用户名" width="120" />
-        <el-table-column prop="realName" label="真实姓名" width="120" />
-        <el-table-column prop="phone" label="手机号" width="130" />
-        <el-table-column prop="email" label="邮箱" width="160" />
+        <el-table-column prop="username" label="用户名" min-width="120" />
+        <el-table-column prop="realName" label="真实姓名" min-width="120" />
+        <el-table-column prop="phone" label="手机号" min-width="130" />
+        <el-table-column prop="email" label="邮箱" min-width="180" />
         <el-table-column prop="roleName" label="角色" width="100" />
-        <el-table-column prop="status" label="状态" width="70">
+        <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
             <StatusTag :status="row.status" :map="ENABLE_STATUS_MAP" />
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="160" />
-        <el-table-column label="操作" width="180" fixed="right">
+        <el-table-column label="操作" width="180" fixed="right" :resizable="false">
           <template #default="{ row }">
             <el-button type="primary" link @click="showDialog(row)">编辑</el-button>
             <el-popconfirm title="确认删除？" @confirm="handleDelete(row.id)">

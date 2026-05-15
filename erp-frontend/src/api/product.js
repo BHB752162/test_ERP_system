@@ -22,7 +22,7 @@ export function deleteProduct(id) {
 
 // Categories
 export function listCategories() {
-  return request.get('/product-categories')
+  return request.get('/product-categories/tree')
 }
 
 export function getCategory(id) {

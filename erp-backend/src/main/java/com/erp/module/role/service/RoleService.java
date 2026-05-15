@@ -6,4 +6,5 @@ import java.util.List;
 
 public interface RoleService {
     List<RoleRespDTO> listAll();
+    void delete(Long id);
 }

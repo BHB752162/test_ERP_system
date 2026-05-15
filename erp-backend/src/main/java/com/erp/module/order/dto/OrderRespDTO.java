@@ -23,7 +23,17 @@ public class OrderRespDTO {
     private BigDecimal finalAmount;
     private String status;
     private String statusDisplay;
+    private String tag;
+    private String mallOrderInfo;
     private String remark;
+    private Long shippingAddressId;
+    private String recipientName;
+    private String recipientPhone;
+    private String recipientAddress;
+    private LocalDateTime submittedAt;
+    private LocalDateTime approvedAt;
+    private Long updatedBy;
+    private String updatedByName;
     private List<SalesOrderItem> items;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

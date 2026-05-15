@@ -15,6 +15,7 @@ CREATE TABLE sys_role (
     role_name   VARCHAR(50)     NOT NULL COMMENT '角色名称',
     role_code   VARCHAR(50)     NOT NULL COMMENT '角色编码 ADMIN/SALES_MANAGER/SALES_PERSON',
     description VARCHAR(255)    DEFAULT NULL COMMENT '描述',
+    status      TINYINT         NOT NULL DEFAULT 1 COMMENT '0=删除 1=正常',
     created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -85,7 +86,30 @@ CREATE TABLE customer (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客户主数据';
 
 -- ============================================
--- 5. 客户付款渠道表
+-- 5. 付款渠道类型表（可管理）
+-- ============================================
+DROP TABLE IF EXISTS payment_channel_type;
+CREATE TABLE payment_channel_type (
+    id          BIGINT          NOT NULL AUTO_INCREMENT,
+    type_code   VARCHAR(50)     NOT NULL COMMENT '类型编码',
+    type_name   VARCHAR(100)    NOT NULL COMMENT '类型名称',
+    sort_order  INT             NOT NULL DEFAULT 0 COMMENT '排序号',
+    status      TINYINT         NOT NULL DEFAULT 1 COMMENT '0=停用 1=启用',
+    created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_type_code (type_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='付款渠道类型';
+
+INSERT INTO payment_channel_type (type_code, type_name, sort_order) VALUES
+('ALIPAY', '支付宝', 1),
+('WECHAT', '微信支付', 2),
+('BANK_CARD', '银行卡', 3),
+('CASH', '现金', 4),
+('OTHER', '其他', 5);
+
+-- ============================================
+-- 6. 客户付款渠道表
 -- ============================================
 DROP TABLE IF EXISTS customer_payment_channel;
 CREATE TABLE customer_payment_channel (
@@ -105,7 +129,7 @@ CREATE TABLE customer_payment_channel (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客户付款渠道';
 
 -- ============================================
--- 6. 客户联系人表
+-- 7. 客户联系人表
 -- ============================================
 DROP TABLE IF EXISTS customer_contact;
 CREATE TABLE customer_contact (
@@ -125,7 +149,7 @@ CREATE TABLE customer_contact (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客户联系人';
 
 -- ============================================
--- 7. 产品分类表
+-- 8. 产品分类表
 -- ============================================
 DROP TABLE IF EXISTS product_category;
 CREATE TABLE product_category (
@@ -142,7 +166,7 @@ CREATE TABLE product_category (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产品分类';
 
 -- ============================================
--- 8. 产品表
+-- 9. 产品表
 -- ============================================
 DROP TABLE IF EXISTS product;
 CREATE TABLE product (
@@ -165,7 +189,7 @@ CREATE TABLE product (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产品';
 
 -- ============================================
--- 9. 销售订单表
+-- 10. 销售订单表
 -- ============================================
 DROP TABLE IF EXISTS sales_order;
 CREATE TABLE sales_order (
@@ -178,6 +202,8 @@ CREATE TABLE sales_order (
     discount_amount DECIMAL(12,2)   NOT NULL DEFAULT 0.00 COMMENT '折扣金额',
     final_amount    DECIMAL(12,2)   NOT NULL DEFAULT 0.00 COMMENT '最终金额',
     status          VARCHAR(30)     NOT NULL DEFAULT 'DRAFT' COMMENT '状态 DRAFT/PENDING_APPROVAL/APPROVED/REJECTED/COMPLETED/CANCELLED',
+    tag             VARCHAR(30)     NOT NULL DEFAULT '' COMMENT '标签：空=无，DELAYED=延迟发货',
+    mall_order_info VARCHAR(200)    DEFAULT '' COMMENT '关联商场订单信息',
     remark          TEXT            DEFAULT NULL COMMENT '备注',
     created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -194,7 +220,7 @@ CREATE TABLE sales_order (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='销售订单';
 
 -- ============================================
--- 10. 订单行项目表
+-- 11. 订单行项目表
 -- ============================================
 DROP TABLE IF EXISTS sales_order_item;
 CREATE TABLE sales_order_item (
@@ -214,7 +240,7 @@ CREATE TABLE sales_order_item (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单行项目';
 
 -- ============================================
--- 11. 订单审批日志表
+-- 12. 订单审批日志表
 -- ============================================
 DROP TABLE IF EXISTS order_audit_log;
 CREATE TABLE order_audit_log (
@@ -232,7 +258,40 @@ CREATE TABLE order_audit_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单审批日志';
 
 -- ============================================
--- 12. 微信号-客户绑定关系表
+-- 13. 客户收件地址表
+-- ============================================
+DROP TABLE IF EXISTS customer_shipping_address;
+CREATE TABLE customer_shipping_address (
+    id              BIGINT          NOT NULL AUTO_INCREMENT,
+    customer_id     BIGINT          NOT NULL COMMENT '客户ID',
+    recipient_name  VARCHAR(100)    NOT NULL COMMENT '收件人姓名',
+    recipient_phone VARCHAR(20)     NOT NULL COMMENT '收件人电话',
+    address         TEXT            NOT NULL COMMENT '收件地址',
+    is_default      TINYINT         NOT NULL DEFAULT 0 COMMENT '0=非默认 1=默认',
+    status          TINYINT         NOT NULL DEFAULT 1 COMMENT '0=停用 1=启用',
+    created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_customer_id (customer_id),
+    CONSTRAINT fk_shipping_address_customer FOREIGN KEY (customer_id) REFERENCES customer(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客户收件地址';
+
+-- sales_order 新增字段
+ALTER TABLE sales_order
+    ADD COLUMN shipping_address_id BIGINT DEFAULT NULL COMMENT '收件地址ID',
+    ADD COLUMN recipient_name VARCHAR(100) DEFAULT NULL COMMENT '收件人姓名（快照）',
+    ADD COLUMN recipient_phone VARCHAR(20) DEFAULT NULL COMMENT '收件人电话（快照）',
+    ADD COLUMN recipient_address TEXT DEFAULT NULL COMMENT '收件地址（快照）',
+    ADD COLUMN submitted_at DATETIME DEFAULT NULL COMMENT '提交审批时间',
+    ADD COLUMN approved_at DATETIME DEFAULT NULL COMMENT '审批通过时间',
+    ADD COLUMN updated_by BIGINT DEFAULT NULL COMMENT '最后更新人ID',
+    ADD COLUMN tag VARCHAR(30) NOT NULL DEFAULT '' COMMENT '标签：空=无，DELAYED=延迟发货',
+    ADD COLUMN mall_order_info VARCHAR(200) DEFAULT '' COMMENT '关联商场订单信息',
+    ADD INDEX idx_shipping_address_id (shipping_address_id),
+    ADD INDEX idx_updated_by (updated_by);
+
+-- ============================================
+-- 14. 微信号-客户绑定关系表
 -- ============================================
 DROP TABLE IF EXISTS customer_wechat_binding;
 CREATE TABLE customer_wechat_binding (

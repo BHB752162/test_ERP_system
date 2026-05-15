@@ -1,4 +1,5 @@
 import request from './request'
+import { downloadBlob } from './download'
 
 export function listOrders(params) {
   return request.get('/orders', { params })
@@ -45,13 +46,17 @@ export function listAuditLogs(params) {
 }
 
 export function listProductsForOrder() {
-  return request.get('/orders/product-list')
+  return request.get('/products', { params: { page: 1, pageSize: 999 } })
 }
 
 export function listWechatsForOrder() {
-  return request.get('/orders/my-wechats')
+  return request.get('/sales-wechats/my-wechats')
 }
 
 export function getBoundCustomers(wechatId) {
-  return request.get(`/orders/bound-customers?wechatId=${wechatId}`)
+  return request.get(`/sales-bindings/bound-customers?wechatId=${wechatId}`)
+}
+
+export function exportOrders(mode, params) {
+  return downloadBlob('/orders/export', { mode, ...params })
 }

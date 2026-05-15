@@ -13,7 +13,13 @@ public class OrderCreateReqDTO {
     @NotNull(message = "微信号不能为空")
     private Long salesWechatId;
 
+    private String tag;
+
+    private String mallOrderInfo;
+
     private String remark;
+
+    private Long shippingAddressId;
 
     @NotNull(message = "订单项不能为空")
     private List<OrderItemReqDTO> items;

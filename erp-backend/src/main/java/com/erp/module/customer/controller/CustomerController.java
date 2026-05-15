@@ -6,9 +6,11 @@ import com.erp.common.response.PageResult;
 import com.erp.module.customer.dto.CustomerContactReqDTO;
 import com.erp.module.customer.dto.CustomerReqDTO;
 import com.erp.module.customer.dto.PaymentChannelReqDTO;
+import com.erp.module.customer.dto.ShippingAddressReqDTO;
 import com.erp.module.customer.entity.Customer;
 import com.erp.module.customer.entity.CustomerContact;
 import com.erp.module.customer.entity.CustomerPaymentChannel;
+import com.erp.module.customer.entity.CustomerShippingAddress;
 import com.erp.module.customer.service.CustomerService;
 import com.erp.security.SecurityUtils;
 import org.springframework.web.bind.annotation.*;
@@ -107,6 +109,33 @@ public class CustomerController {
     @DeleteMapping("/contacts/{id}")
     public ApiResponse<Void> deleteContact(@PathVariable Long id) {
         customerService.deleteContact(id);
+        return ApiResponse.success();
+    }
+
+    // Shipping addresses
+    @GetMapping("/{customerId}/shipping-addresses")
+    public ApiResponse<List<CustomerShippingAddress>> listShippingAddresses(@PathVariable Long customerId) {
+        return ApiResponse.success(customerService.listShippingAddresses(customerId));
+    }
+
+    @PostMapping("/{customerId}/shipping-addresses")
+    public ApiResponse<Void> createShippingAddress(@PathVariable Long customerId,
+                                                    @Valid @RequestBody ShippingAddressReqDTO req) {
+        req.setCustomerId(customerId);
+        customerService.createShippingAddress(req);
+        return ApiResponse.success();
+    }
+
+    @PutMapping("/shipping-addresses/{id}")
+    public ApiResponse<Void> updateShippingAddress(@PathVariable Long id,
+                                                    @Valid @RequestBody ShippingAddressReqDTO req) {
+        customerService.updateShippingAddress(id, req);
+        return ApiResponse.success();
+    }
+
+    @DeleteMapping("/shipping-addresses/{id}")
+    public ApiResponse<Void> deleteShippingAddress(@PathVariable Long id) {
+        customerService.deleteShippingAddress(id);
         return ApiResponse.success();
     }
 }

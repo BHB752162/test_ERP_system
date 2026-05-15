@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **后端**: Spring Boot 2.7.18 + MyBatis-Plus 3.5.3.1 + Spring Security + JWT (jjwt 0.11.5), JDK 17
 - **前端**: Vue 3.4 + Vite 5 + Element Plus 2.5 + Pinia 2.1 + Vue Router 4.3 + Axios 1.6
-- **数据库**: MySQL 8.0+, 12 张 InnoDB 表, utf8mb4
+- **数据库**: MySQL 8.0+, 14 张 InnoDB 表 + 1 个 ALTER TABLE, utf8mb4
 - **项目路径**: `E:\project\test_ERP_system\`
 
 ## Run Commands
@@ -45,19 +45,29 @@ cd E:/project/test_ERP_system/erp-frontend && npm run dev
 | `auth` | — | 登录, 获取用户信息 |
 | `user` + `role` | sys_user, sys_role | ADMIN 可用 |
 | `wechat` | sales_wechat | 销售微信号 CRUD, 一个销售可多个 |
-| `customer` | customer, customer_payment_channel, customer_contact | 顾客信息 + 付款渠道 + 联系人 |
+| `customer` | customer, customer_payment_channel, customer_contact, customer_shipping_address, payment_channel_type | 顾客信息 + 付款渠道 + 联系人 + 收件地址 + 渠道类型管理 |
 | `product` | product, product_category | 产品 + 分类树 |
 | `binding` | customer_wechat_binding | 微信号↔顾客多对多绑定 |
 | `order` | sales_order, sales_order_item | 下单 + 审批工作流 |
 | `audit` | order_audit_log | 审批日志查询 |
 
-### Security Rules (SecurityConfig.java)
+**顾客模块子资源端点:**
+
+| 子资源 | 端点前缀 | 说明 |
+|--------|---------|------|
+| 付款渠道 | `/api/customers/{cid}/payment-channels` | CRUD |
+| 联系人 | `/api/customers/{cid}/contacts` | CRUD |
+| 收件地址 | `/api/customers/{cid}/shipping-addresses` | CRUD, 默认地址互斥 |
+| 渠道类型 | `/api/payment-channel-types` | 独立CRUD, POST/PUT/DELETE仅 ADMIN/MANAGER |
+
+### Security Rules (SecurityConfig.java + @PreAuthorize)
 
 ```
 POST /api/auth/login        → permitAll
 /api/users/**, /api/roles/** → hasRole('ADMIN')
 /api/sales-bindings/**       → hasAnyRole('ADMIN', 'SALES_MANAGER')
 /api/orders/*/approve|reject → hasAnyRole('ADMIN', 'SALES_MANAGER')
+POST/PUT/DELETE /api/payment-channel-types → @PreAuthorize("hasAnyRole('ADMIN', 'SALES_MANAGER')")
 所有其他 /api/**            → authenticated
 无状态会话, JWT 过滤器在 UsernamePasswordAuthenticationFilter 之前
 ```
@@ -72,8 +82,10 @@ DRAFT / PENDING_APPROVAL → (取消) → CANCELLED
 
 - 权限: SALES_PERSON 只能操作自己的订单; ADMIN/SALES_MANAGER 可看全部
 - 下单核心校验: 选择微信号 → 该微信号必须已绑定所选顾客 (customer_wechat_binding)
-- 订单号生成: `ORD`+yyMMdd+6位顺序号 (每日重置)
+- 订单号生成: `B`+yyMMdd+6位顺序号 (每日重置)
 - 操作记录: 每次状态变更写入 order_audit_log
+- 订单保存字段: submittedAt(提交审批时间), approvedAt(审批通过时间), updatedBy(最后更新人), tag(标签: 空=无/DELAYED=延迟发货), mallOrderInfo(关联商场订单号)
+- 收件地址快照: 创建订单时从 customer_shipping_address 快照到 sales_order(recipient_name/phone/address)
 
 ### Frontend Structure (`src/`)
 
@@ -88,7 +100,7 @@ DRAFT / PENDING_APPROVAL → (取消) → CANCELLED
 
 - `request.js` 拦截器: 请求加 `Authorization: Bearer` header; 响应处理统一错误弹窗, 401 自动跳转登录
 - `router/index.js` navigation guard: 检查 token 和 meta.roles
-- `Sidebar.vue` 菜单项: 用户管理菜单通过 `v-if="hasRole('ADMIN')"` 控制显隐
+- `Sidebar.vue` 菜单项: "系统管理"子菜单含"渠道类型"+"用户管理(仅ADMIN)"
 
 ### Key Data Relationships
 
@@ -100,6 +112,9 @@ sys_user ─1:N→ sales_order (sales_person_id 记录谁下的单)
 sales_wechat ─1:N→ sales_order (sales_wechat_id 记录用哪个微信号下的单)
 sales_order ─1:N→ sales_order_item ─N:1→ product
 sales_order ─1:N→ order_audit_log
+customer ─1:N→ customer_payment_channel
+customer ─1:N→ customer_contact
+customer ─1:N→ customer_shipping_address
 ```
 
 ### API Response Format

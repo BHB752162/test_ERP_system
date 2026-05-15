@@ -49,4 +49,10 @@ public class UserController {
         userService.updateStatus(id, status);
         return ApiResponse.success();
     }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        userService.deleteUser(id);
+        return ApiResponse.success();
+    }
 }

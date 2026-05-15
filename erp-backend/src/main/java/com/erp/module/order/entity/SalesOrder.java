@@ -28,11 +28,29 @@ public class SalesOrder {
 
     private String status;
 
+    private String tag;
+
+    private String mallOrderInfo;
+
     private String remark;
+
+    private Long shippingAddressId;
+
+    private String recipientName;
+
+    private String recipientPhone;
+
+    private String recipientAddress;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 
     @TableField(fill = FieldFill.INSERT_UPDATE)
     private LocalDateTime updatedAt;
+
+    private LocalDateTime submittedAt;
+
+    private LocalDateTime approvedAt;
+
+    private Long updatedBy;
 }

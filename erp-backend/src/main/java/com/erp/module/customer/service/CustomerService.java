@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.erp.module.customer.dto.CustomerContactReqDTO;
 import com.erp.module.customer.dto.CustomerReqDTO;
 import com.erp.module.customer.dto.PaymentChannelReqDTO;
+import com.erp.module.customer.dto.ShippingAddressReqDTO;
 import com.erp.module.customer.entity.Customer;
 import com.erp.module.customer.entity.CustomerContact;
 import com.erp.module.customer.entity.CustomerPaymentChannel;
+import com.erp.module.customer.entity.CustomerShippingAddress;
 
 import java.util.List;
 
@@ -28,4 +30,10 @@ public interface CustomerService {
     void createContact(CustomerContactReqDTO req);
     void updateContact(Long id, CustomerContactReqDTO req);
     void deleteContact(Long id);
+
+    // Shipping addresses
+    List<CustomerShippingAddress> listShippingAddresses(Long customerId);
+    void createShippingAddress(ShippingAddressReqDTO req);
+    void updateShippingAddress(Long id, ShippingAddressReqDTO req);
+    void deleteShippingAddress(Long id);
 }

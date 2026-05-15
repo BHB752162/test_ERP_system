@@ -1,6 +1,7 @@
 package com.erp.module.wechat.controller;
 
 import com.erp.common.response.ApiResponse;
+import com.erp.common.response.PageResult;
 import com.erp.module.wechat.dto.WechatReqDTO;
 import com.erp.module.wechat.dto.WechatRespDTO;
 import com.erp.module.wechat.service.SalesWechatService;
@@ -17,6 +18,14 @@ public class SalesWechatController {
 
     @Resource
     private SalesWechatService salesWechatService;
+
+    @GetMapping
+    public ApiResponse<PageResult<WechatRespDTO>> listAll(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(defaultValue = "1") Integer page,
+            @RequestParam(defaultValue = "20") Integer pageSize) {
+        return ApiResponse.success(PageResult.of(salesWechatService.listAll(keyword, page, pageSize)));
+    }
 
     @GetMapping("/by-sales/{salesPersonId}")
     public ApiResponse<List<WechatRespDTO>> listBySalesPerson(@PathVariable Long salesPersonId) {

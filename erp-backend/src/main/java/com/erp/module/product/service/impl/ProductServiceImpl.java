@@ -31,7 +31,7 @@ public class ProductServiceImpl implements ProductService {
             wrapper.like(Product::getProductName, keyword)
                     .or().like(Product::getProductCode, keyword);
         }
-        wrapper.orderByDesc(Product::getCreatedAt);
+        wrapper.ne(Product::getStatus, 0).orderByDesc(Product::getCreatedAt);
         return productMapper.selectPage(pageParam, wrapper);
     }
 
@@ -61,6 +61,9 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public void delete(Long id) {
-        productMapper.deleteById(id);
+        Product product = productMapper.selectById(id);
+        if (product == null) throw new BusinessException("产品不存在");
+        product.setStatus(0);
+        productMapper.updateById(product);
     }
 }

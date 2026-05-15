@@ -45,6 +45,12 @@
             <StatusTag :status="row.status" :map="ORDER_STATUS_MAP" />
           </template>
         </el-table-column>
+        <el-table-column label="标签" width="90">
+          <template #default="{ row }">
+            <StatusTag :status="row.tag || ''" :map="ORDER_TAG_MAP" />
+          </template>
+        </el-table-column>
+        <el-table-column prop="remark" label="备注" min-width="140" show-overflow-tooltip />
         <el-table-column prop="createdAt" label="创建时间" width="160" />
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
@@ -63,7 +69,7 @@
 import { onMounted } from 'vue'
 import { listOrders } from '../../api/order'
 import { useCrudList } from '../../composables/useCrudList'
-import { ORDER_STATUS_MAP } from '../../constants'
+import { ORDER_STATUS_MAP, ORDER_TAG_MAP } from '../../constants'
 import Pagination from '../../components/Pagination.vue'
 import StatusTag from '../../components/StatusTag.vue'
 

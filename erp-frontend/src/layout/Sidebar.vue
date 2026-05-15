@@ -34,7 +34,7 @@
         </el-menu-item>
       </el-sub-menu>
 
-      <el-sub-menu index="product">
+      <el-sub-menu v-if="auth.hasAnyRole(['ADMIN', 'SALES_MANAGER'])" index="product">
         <template #title>
           <el-icon><Goods /></el-icon>
           <span>产品管理</span>
@@ -49,7 +49,7 @@
         </el-menu-item>
       </el-sub-menu>
 
-      <el-sub-menu index="wechat">
+      <el-sub-menu v-if="auth.hasAnyRole(['ADMIN', 'SALES_MANAGER'])" index="wechat">
         <template #title>
           <el-icon><ChatDotRound /></el-icon>
           <span>微信号管理</span>
@@ -90,10 +90,21 @@
         </el-menu-item>
       </el-sub-menu>
 
-      <el-menu-item v-if="auth.hasRole('ADMIN')" index="/users">
-        <el-icon><Setting /></el-icon>
-        <span>用户管理</span>
-      </el-menu-item>
+      <el-sub-menu v-if="auth.hasAnyRole(['ADMIN', 'SALES_MANAGER'])" index="system">
+        <template #title>
+          <el-icon><Setting /></el-icon>
+          <span>系统管理</span>
+        </template>
+        <el-menu-item index="/channel-types">
+          <el-icon><Coin /></el-icon>
+          <span>渠道类型</span>
+        </el-menu-item>
+        <el-menu-item v-if="auth.hasRole('ADMIN')" index="/users">
+          <el-icon><UserFilled /></el-icon>
+          <span>用户管理</span>
+        </el-menu-item>
+      </el-sub-menu>
+
     </el-menu>
   </el-aside>
 </template>
@@ -113,6 +124,7 @@ const openedMenus = computed(() => {
   if (path.startsWith('/wechats') || path.startsWith('/bindings')) return ['wechat']
   if (path.startsWith('/orders')) return ['order']
   if (path.startsWith('/audit')) return ['audit']
+  if (path.startsWith('/channel-types') || path.startsWith('/users')) return ['system']
   return []
 })
 </script>

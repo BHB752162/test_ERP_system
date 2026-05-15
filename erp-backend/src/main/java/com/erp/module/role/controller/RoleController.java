@@ -3,9 +3,7 @@ package com.erp.module.role.controller;
 import com.erp.common.response.ApiResponse;
 import com.erp.module.role.dto.RoleRespDTO;
 import com.erp.module.role.service.RoleService;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import java.util.List;
@@ -20,5 +18,11 @@ public class RoleController {
     @GetMapping
     public ApiResponse<List<RoleRespDTO>> listAll() {
         return ApiResponse.success(roleService.listAll());
+    }
+
+    @DeleteMapping("/{id}")
+    public ApiResponse<Void> delete(@PathVariable Long id) {
+        roleService.delete(id);
+        return ApiResponse.success();
     }
 }

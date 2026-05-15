@@ -1,4 +1,4 @@
-package com.erp.module.role.entity;
+package com.erp.module.customer.entity;
 
 import com.baomidou.mybatisplus.annotation.*;
 import lombok.Data;
@@ -6,16 +6,16 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("sys_role")
-public class SysRole {
+@TableName("payment_channel_type")
+public class PaymentChannelType {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private String roleName;
+    private String typeCode;
 
-    private String roleCode;
+    private String typeName;
 
-    private String description;
+    private Integer sortOrder;
 
     private Integer status;
 

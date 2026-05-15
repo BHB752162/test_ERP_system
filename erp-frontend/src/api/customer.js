@@ -53,3 +53,20 @@ export function updateContact(customerId, id, data) {
 export function deleteContact(customerId, id) {
   return request.delete(`/customers/${customerId}/contacts/${id}`)
 }
+
+// Shipping addresses
+export function listShippingAddresses(customerId) {
+  return request.get(`/customers/${customerId}/shipping-addresses`)
+}
+
+export function createShippingAddress(customerId, data) {
+  return request.post(`/customers/${customerId}/shipping-addresses`, data)
+}
+
+export function updateShippingAddress(id, data) {
+  return request.put(`/customers/shipping-addresses/${id}`, data)
+}
+
+export function deleteShippingAddress(id) {
+  return request.delete(`/customers/shipping-addresses/${id}`)
+}

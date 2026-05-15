@@ -8,6 +8,13 @@ export const ORDER_STATUS_MAP = {
   CANCELLED: { label: '已取消', type: 'info' }
 }
 
+// 订单标签映射
+export const ORDER_TAG_MAP = {
+  '': { label: '无', type: 'info' },
+  DELAYED: { label: '延迟发货', type: 'danger' },
+  WASH_CARE: { label: '洗护订单', type: 'primary' }
+}
+
 // 订单审核操作映射
 export const ORDER_ACTION_MAP = {
   SUBMIT: { label: '提交申请', type: 'primary' },

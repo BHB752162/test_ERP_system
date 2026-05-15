@@ -5,6 +5,7 @@ import com.erp.security.JwtAuthenticationEntryPoint;
 import com.erp.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableGlobalMethodSecurity;
@@ -59,6 +60,7 @@ public class SecurityConfig {
                 .antMatchers("/api/auth/login").permitAll()
                 .antMatchers("/api/users/**").hasRole("ADMIN")
                 .antMatchers("/api/roles/**").hasRole("ADMIN")
+                .antMatchers(HttpMethod.GET, "/api/sales-bindings/**").authenticated()
                 .antMatchers("/api/sales-bindings/**").hasAnyRole("ADMIN", "SALES_MANAGER")
                 .antMatchers("/api/orders/*/approve", "/api/orders/*/reject").hasAnyRole("ADMIN", "SALES_MANAGER")
                 .anyRequest().authenticated()
