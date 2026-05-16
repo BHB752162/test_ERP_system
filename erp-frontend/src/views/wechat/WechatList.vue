@@ -39,6 +39,9 @@
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="160" />
+        <el-table-column prop="createdByName" label="创建人" min-width="100" />
+        <el-table-column prop="updatedAt" label="更新时间" width="160" />
+        <el-table-column prop="updatedByName" label="更新人" min-width="100" />
         <el-table-column label="操作" width="180" fixed="right">
           <template #default="{ row }">
             <el-button type="primary" link @click="showDialog(row)">编辑</el-button>
@@ -111,8 +114,10 @@ const rules = {
 
 function showDialog(row) {
   isEdit.value = !!row
-  if (row) Object.assign(formData, row)
-  else Object.assign(formData, { ...defaultForm })
+  for (const key in formData) {
+    delete formData[key]
+  }
+  Object.assign(formData, row ? { ...row } : { ...defaultForm })
   dialogVisible.value = true
 }
 

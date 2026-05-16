@@ -8,6 +8,8 @@ public class LoginRespDTO {
     private Long userId;
     private String username;
     private String realName;
+    private String phone;
+    private String email;
     private String roleCode;
     private String roleName;
 }

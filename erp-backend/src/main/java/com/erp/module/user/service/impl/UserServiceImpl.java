@@ -11,12 +11,17 @@ import com.erp.module.user.dto.UserRespDTO;
 import com.erp.module.user.entity.SysUser;
 import com.erp.module.user.mapper.SysUserMapper;
 import com.erp.module.user.service.UserService;
+import com.erp.security.SecurityUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -42,7 +47,26 @@ public class UserServiceImpl implements UserService {
         wrapper.ne(SysUser::getStatus, 0).orderByDesc(SysUser::getCreatedAt);
 
         IPage<SysUser> userPage = sysUserMapper.selectPage(pageParam, wrapper);
-        return userPage.convert(this::toRespDTO);
+        List<UserRespDTO> records = userPage.getRecords().stream().map(this::toRespDTO).collect(Collectors.toList());
+
+        // 批量加载创建人/更新人姓名
+        Set<Long> userIds = new java.util.HashSet<>();
+        for (UserRespDTO dto : records) {
+            if (dto.getCreatedBy() != null) userIds.add(dto.getCreatedBy());
+            if (dto.getUpdatedBy() != null) userIds.add(dto.getUpdatedBy());
+        }
+        if (!userIds.isEmpty()) {
+            Map<Long, String> userMap = sysUserMapper.selectBatchIds(userIds).stream()
+                    .collect(Collectors.toMap(SysUser::getId, SysUser::getRealName));
+            for (UserRespDTO dto : records) {
+                if (dto.getCreatedBy() != null) dto.setCreatedByName(userMap.get(dto.getCreatedBy()));
+                if (dto.getUpdatedBy() != null) dto.setUpdatedByName(userMap.get(dto.getUpdatedBy()));
+            }
+        }
+
+        Page<UserRespDTO> resultPage = new Page<>(userPage.getCurrent(), userPage.getSize(), userPage.getTotal());
+        resultPage.setRecords(records);
+        return resultPage;
     }
 
     @Override
@@ -64,6 +88,9 @@ public class UserServiceImpl implements UserService {
         }
         user.setPassword(passwordEncoder.encode(req.getPassword()));
         if (user.getStatus() == null) user.setStatus(1);
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        user.setCreatedBy(currentUserId);
+        user.setUpdatedBy(currentUserId);
         sysUserMapper.insert(user);
     }
 
@@ -81,6 +108,7 @@ public class UserServiceImpl implements UserService {
         if (StringUtils.isNotBlank(req.getPassword())) {
             user.setPassword(passwordEncoder.encode(req.getPassword()));
         }
+        user.setUpdatedBy(SecurityUtils.getCurrentUserId());
         sysUserMapper.updateById(user);
     }
 
@@ -97,6 +125,15 @@ public class UserServiceImpl implements UserService {
         SysUser user = sysUserMapper.selectById(id);
         if (user == null) throw new BusinessException("用户不存在");
         user.setStatus(0);
+        sysUserMapper.updateById(user);
+    }
+
+    @Override
+    public void resetPassword(Long id) {
+        SysUser user = sysUserMapper.selectById(id);
+        if (user == null) throw new BusinessException("用户不存在");
+        user.setPassword(passwordEncoder.encode("123456"));
+        user.setUpdatedBy(SecurityUtils.getCurrentUserId());
         sysUserMapper.updateById(user);
     }
 

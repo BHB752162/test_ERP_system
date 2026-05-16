@@ -19,6 +19,21 @@
         <span>仪表盘</span>
       </el-menu-item>
 
+      <el-sub-menu index="order">
+        <template #title>
+          <el-icon><List /></el-icon>
+          <span>订单管理</span>
+        </template>
+        <el-menu-item index="/orders">
+          <el-icon><Menu /></el-icon>
+          <span>订单列表</span>
+        </el-menu-item>
+        <el-menu-item index="/orders/create">
+          <el-icon><Edit /></el-icon>
+          <span>创建订单</span>
+        </el-menu-item>
+      </el-sub-menu>
+
       <el-sub-menu index="customer">
         <template #title>
           <el-icon><User /></el-icon>
@@ -31,21 +46,6 @@
         <el-menu-item index="/customers/create">
           <el-icon><Plus /></el-icon>
           <span>新增顾客</span>
-        </el-menu-item>
-      </el-sub-menu>
-
-      <el-sub-menu v-if="auth.hasAnyRole(['ADMIN', 'SALES_MANAGER'])" index="product">
-        <template #title>
-          <el-icon><Goods /></el-icon>
-          <span>产品管理</span>
-        </template>
-        <el-menu-item index="/products">
-          <el-icon><Menu /></el-icon>
-          <span>产品列表</span>
-        </el-menu-item>
-        <el-menu-item index="/categories">
-          <el-icon><FolderOpened /></el-icon>
-          <span>产品分类</span>
         </el-menu-item>
       </el-sub-menu>
 
@@ -64,29 +64,18 @@
         </el-menu-item>
       </el-sub-menu>
 
-      <el-sub-menu index="order">
+      <el-sub-menu v-if="auth.hasAnyRole(['ADMIN', 'SALES_MANAGER'])" index="product">
         <template #title>
-          <el-icon><List /></el-icon>
-          <span>订单管理</span>
+          <el-icon><Goods /></el-icon>
+          <span>产品管理</span>
         </template>
-        <el-menu-item index="/orders">
+        <el-menu-item index="/products">
           <el-icon><Menu /></el-icon>
-          <span>订单列表</span>
+          <span>产品列表</span>
         </el-menu-item>
-        <el-menu-item index="/orders/create">
-          <el-icon><Edit /></el-icon>
-          <span>创建订单</span>
-        </el-menu-item>
-      </el-sub-menu>
-
-      <el-sub-menu index="audit">
-        <template #title>
-          <el-icon><DocumentChecked /></el-icon>
-          <span>审批管理</span>
-        </template>
-        <el-menu-item index="/audit-logs">
-          <el-icon><Clock /></el-icon>
-          <span>审批日志</span>
+        <el-menu-item index="/categories">
+          <el-icon><FolderOpened /></el-icon>
+          <span>产品分类</span>
         </el-menu-item>
       </el-sub-menu>
 
@@ -105,6 +94,17 @@
         </el-menu-item>
       </el-sub-menu>
 
+      <el-sub-menu index="audit">
+        <template #title>
+          <el-icon><DocumentChecked /></el-icon>
+          <span>审批管理</span>
+        </template>
+        <el-menu-item index="/audit-logs">
+          <el-icon><Clock /></el-icon>
+          <span>审批日志</span>
+        </el-menu-item>
+      </el-sub-menu>
+
     </el-menu>
   </el-aside>
 </template>
@@ -119,12 +119,12 @@ const auth = useAuthStore()
 
 const openedMenus = computed(() => {
   const path = route.path
-  if (path.startsWith('/customers')) return ['customer']
-  if (path.startsWith('/products') || path.startsWith('/categories')) return ['product']
-  if (path.startsWith('/wechats') || path.startsWith('/bindings')) return ['wechat']
   if (path.startsWith('/orders')) return ['order']
-  if (path.startsWith('/audit')) return ['audit']
+  if (path.startsWith('/customers')) return ['customer']
+  if (path.startsWith('/wechats') || path.startsWith('/bindings')) return ['wechat']
+  if (path.startsWith('/products') || path.startsWith('/categories')) return ['product']
   if (path.startsWith('/channel-types') || path.startsWith('/users')) return ['system']
+  if (path.startsWith('/audit')) return ['audit']
   return []
 })
 </script>

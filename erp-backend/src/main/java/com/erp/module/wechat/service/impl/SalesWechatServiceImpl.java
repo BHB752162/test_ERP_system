@@ -11,13 +11,15 @@ import com.erp.module.wechat.dto.WechatRespDTO;
 import com.erp.module.wechat.entity.SalesWechat;
 import com.erp.module.wechat.mapper.SalesWechatMapper;
 import com.erp.module.wechat.service.SalesWechatService;
+import com.erp.security.SecurityUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 @Service
 public class SalesWechatServiceImpl implements SalesWechatService {
@@ -30,12 +32,12 @@ public class SalesWechatServiceImpl implements SalesWechatService {
 
     @Override
     public List<WechatRespDTO> listBySalesPerson(Long salesPersonId) {
-        return salesWechatMapper.selectList(
+        List<SalesWechat> list = salesWechatMapper.selectList(
                 new LambdaQueryWrapper<SalesWechat>()
                         .eq(SalesWechat::getSalesPersonId, salesPersonId)
                         .ne(SalesWechat::getStatus, 0)
-                        .orderByDesc(SalesWechat::getCreatedAt))
-                .stream().map(this::toRespDTO).collect(Collectors.toList());
+                        .orderByDesc(SalesWechat::getCreatedAt));
+        return convertList(list);
     }
 
     @Override
@@ -53,7 +55,10 @@ public class SalesWechatServiceImpl implements SalesWechatService {
                     .or().like(SalesWechat::getWechatNickname, keyword));
         }
         IPage<SalesWechat> pageResult = salesWechatMapper.selectPage(new Page<>(page, pageSize), wrapper);
-        return pageResult.convert(this::toRespDTO);
+        List<WechatRespDTO> dtoList = convertList(pageResult.getRecords());
+        IPage<WechatRespDTO> result = new Page<>(pageResult.getCurrent(), pageResult.getSize(), pageResult.getTotal());
+        result.setRecords(dtoList);
+        return result;
     }
 
     @Override
@@ -68,6 +73,9 @@ public class SalesWechatServiceImpl implements SalesWechatService {
         SalesWechat wechat = new SalesWechat();
         BeanUtils.copyProperties(req, wechat);
         if (wechat.getStatus() == null) wechat.setStatus(1);
+        Long userId = SecurityUtils.getCurrentUserId();
+        wechat.setCreatedBy(userId);
+        wechat.setUpdatedBy(userId);
         salesWechatMapper.insert(wechat);
     }
 
@@ -76,6 +84,7 @@ public class SalesWechatServiceImpl implements SalesWechatService {
         SalesWechat wechat = salesWechatMapper.selectById(id);
         if (wechat == null) throw new BusinessException("微信号不存在");
         BeanUtils.copyProperties(req, wechat);
+        wechat.setUpdatedBy(SecurityUtils.getCurrentUserId());
         salesWechatMapper.updateById(wechat);
     }
 
@@ -90,10 +99,36 @@ public class SalesWechatServiceImpl implements SalesWechatService {
     private WechatRespDTO toRespDTO(SalesWechat wechat) {
         WechatRespDTO dto = new WechatRespDTO();
         BeanUtils.copyProperties(wechat, dto);
-        SysUser user = sysUserMapper.selectById(wechat.getSalesPersonId());
-        if (user != null) {
-            dto.setSalesPersonName(user.getRealName());
+        if (wechat.getSalesPersonId() != null) {
+            SysUser user = sysUserMapper.selectById(wechat.getSalesPersonId());
+            if (user != null) dto.setSalesPersonName(user.getRealName());
+        }
+        if (wechat.getCreatedBy() != null) {
+            SysUser user = sysUserMapper.selectById(wechat.getCreatedBy());
+            if (user != null) dto.setCreatedByName(user.getRealName());
+        }
+        if (wechat.getUpdatedBy() != null) {
+            SysUser user = sysUserMapper.selectById(wechat.getUpdatedBy());
+            if (user != null) dto.setUpdatedByName(user.getRealName());
         }
         return dto;
+    }
+
+    private List<WechatRespDTO> convertList(List<SalesWechat> list) {
+        Set<Long> userIds = list.stream()
+                .flatMap(w -> Stream.of(w.getSalesPersonId(), w.getCreatedBy(), w.getUpdatedBy()))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        Map<Long, String> userMap = userIds.isEmpty() ? Collections.emptyMap()
+                : sysUserMapper.selectBatchIds(userIds).stream()
+                    .collect(Collectors.toMap(SysUser::getId, SysUser::getRealName));
+        return list.stream().map(w -> {
+            WechatRespDTO dto = new WechatRespDTO();
+            BeanUtils.copyProperties(w, dto);
+            dto.setSalesPersonName(userMap.get(w.getSalesPersonId()));
+            dto.setCreatedByName(userMap.get(w.getCreatedBy()));
+            dto.setUpdatedByName(userMap.get(w.getUpdatedBy()));
+            return dto;
+        }).collect(Collectors.toList());
     }
 }

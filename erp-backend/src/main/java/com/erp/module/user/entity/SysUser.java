@@ -25,6 +25,16 @@ public class SysUser {
 
     private Long roleId;
 
+    private Long createdBy;
+
+    private Long updatedBy;
+
+    @TableField(exist = false)
+    private String createdByName;
+
+    @TableField(exist = false)
+    private String updatedByName;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

@@ -6,7 +6,6 @@ import com.erp.module.product.dto.ProductCategoryReqDTO;
 import com.erp.module.product.dto.ProductCategoryRespDTO;
 import com.erp.module.product.entity.ProductCategory;
 import com.erp.module.product.mapper.ProductCategoryMapper;
-import com.erp.module.product.mapper.ProductMapper;
 import com.erp.module.product.service.ProductCategoryService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
@@ -22,9 +21,6 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
 
     @Resource
     private ProductCategoryMapper productCategoryMapper;
-
-    @Resource
-    private ProductMapper productMapper;
 
     @Override
     public List<ProductCategoryRespDTO> listTree() {
@@ -77,11 +73,6 @@ public class ProductCategoryServiceImpl implements ProductCategoryService {
         Long count = productCategoryMapper.selectCount(
                 new LambdaQueryWrapper<ProductCategory>().eq(ProductCategory::getParentId, id));
         if (count > 0) throw new BusinessException("该分类下有子分类，无法删除");
-
-        Long productCount = productMapper.selectCount(
-                new com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper<com.erp.module.product.entity.Product>()
-                        .eq(com.erp.module.product.entity.Product::getCategoryId, id));
-        if (productCount > 0) throw new BusinessException("该分类下有产品，无法删除");
 
         ProductCategory category = productCategoryMapper.selectById(id);
         if (category == null) throw new BusinessException("分类不存在");

@@ -14,9 +14,9 @@ public class Product {
 
     private String productName;
 
-    private Long categoryId;
-
     private String productCode;
+
+    private String productType;
 
     private String description;
 
@@ -27,6 +27,16 @@ public class Product {
     private Integer stockQuantity;
 
     private Integer status;
+
+    private Long createdBy;
+
+    private Long updatedBy;
+
+    @TableField(exist = false)
+    private String createdByName;
+
+    @TableField(exist = false)
+    private String updatedByName;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;

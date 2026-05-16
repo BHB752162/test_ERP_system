@@ -10,7 +10,8 @@ public class ProductReqDTO {
     @NotBlank(message = "产品名称不能为空")
     private String productName;
 
-    private Long categoryId;
+    @NotBlank(message = "产品类型不能为空")
+    private String productType;
 
     private String productCode;
 

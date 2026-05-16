@@ -2,8 +2,8 @@
   <div>
     <el-card shadow="never" class="search-card">
       <el-form :model="query" inline>
-        <el-form-item label="用户名">
-          <el-input v-model="query.keyword" placeholder="用户名/姓名" clearable @keyup.enter="search" />
+        <el-form-item label="工号">
+          <el-input v-model="query.keyword" placeholder="工号/姓名" clearable @keyup.enter="search" />
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="search" :loading="loading">查询</el-button>
@@ -24,7 +24,7 @@
           <el-empty :description="query.keyword ? '没有找到匹配的用户' : '暂无用户数据'" />
         </template>
         <el-table-column prop="id" label="ID" width="60" />
-        <el-table-column prop="username" label="用户名" min-width="120" />
+        <el-table-column prop="username" label="工号" min-width="120" />
         <el-table-column prop="realName" label="真实姓名" min-width="120" />
         <el-table-column prop="phone" label="手机号" min-width="130" />
         <el-table-column prop="email" label="邮箱" min-width="180" />
@@ -35,9 +35,17 @@
           </template>
         </el-table-column>
         <el-table-column prop="createdAt" label="创建时间" width="160" />
-        <el-table-column label="操作" width="180" fixed="right" :resizable="false">
+        <el-table-column prop="createdByName" label="创建人员" min-width="100" />
+        <el-table-column prop="updatedAt" label="更新时间" width="160" />
+        <el-table-column prop="updatedByName" label="更新人员" min-width="100" />
+        <el-table-column label="操作" width="260" fixed="right" :resizable="false">
           <template #default="{ row }">
             <el-button type="primary" link @click="showDialog(row)">编辑</el-button>
+            <el-popconfirm title="确认将密码重置为 123456？" @confirm="handleResetPwd(row.id)">
+              <template #reference>
+                <el-button type="warning" link>重置密码</el-button>
+              </template>
+            </el-popconfirm>
             <el-popconfirm title="确认删除？" @confirm="handleDelete(row.id)">
               <template #reference>
                 <el-button type="danger" link>删除</el-button>
@@ -54,12 +62,12 @@
     <!-- Dialog -->
     <el-dialog v-model="dialogVisible" :title="isEdit ? '编辑用户' : '新增用户'" width="500px" @close="closeDialog">
       <el-form ref="formRef" :model="formData" :rules="rules" label-width="100px">
-        <el-form-item label="用户名" prop="username">
+        <el-form-item label="工号" prop="username">
           <el-input v-model="formData.username" :disabled="isEdit" />
         </el-form-item>
-        <el-form-item :label="isEdit ? '新密码' : '密码'" prop="password">
-          <el-input v-model="formData.password" type="password" show-password :placeholder="isEdit ? '留空则不修改' : ''" />
-        </el-form-item>
+	        <el-form-item v-if="!isEdit" label="密码" prop="password">
+	          <el-input v-model="formData.password" type="password" show-password />
+	        </el-form-item>
         <el-form-item label="真实姓名" prop="realName">
           <el-input v-model="formData.realName" />
         </el-form-item>
@@ -88,7 +96,8 @@
 
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
-import { listUsers, createUser, updateUser, deleteUser, listRoles } from '../../api/user'
+import { ElMessage } from 'element-plus'
+import { listUsers, createUser, updateUser, deleteUser, listRoles, resetPassword } from '../../api/user'
 import { useCrudList, useDeleteAction } from '../../composables/useCrudList'
 import { ENABLE_STATUS_MAP } from '../../constants'
 import Pagination from '../../components/Pagination.vue'
@@ -96,6 +105,13 @@ import StatusTag from '../../components/StatusTag.vue'
 
 const { list, total, loading, query, fetchData, search, reset, onPageChange } = useCrudList(listUsers, { defaultQuery: { keyword: '' } })
 const { handleDelete } = useDeleteAction(deleteUser, fetchData)
+
+async function handleResetPwd(id) {
+  try {
+    await resetPassword(id)
+    ElMessage.success('密码已重置为 123456')
+  } catch { /* handled by interceptor */ }
+}
 
 const roles = ref([])
 const submitting = ref(false)
@@ -106,7 +122,7 @@ const isEdit = ref(false)
 const defaultForm = { username: '', password: '', realName: '', phone: '', email: '', roleId: null, status: 1 }
 const formData = reactive({ ...defaultForm })
 const rules = reactive({
-  username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
+  username: [{ required: true, message: '请输入工号', trigger: 'blur' }],
   password: [
     { required: true, message: '请输入密码', trigger: 'blur' },
     { min: 6, message: '密码至少6位', trigger: 'blur' }
@@ -116,6 +132,9 @@ const rules = reactive({
 
 function showDialog(row) {
   isEdit.value = !!row
+  for (const key in formData) {
+    delete formData[key]
+  }
   if (row) {
     Object.assign(formData, row, { password: '' })
     rules.password = [{ min: 6, message: '密码至少6位', trigger: 'blur' }]

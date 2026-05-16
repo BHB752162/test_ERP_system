@@ -55,4 +55,10 @@ public class UserController {
         userService.deleteUser(id);
         return ApiResponse.success();
     }
+
+    @PutMapping("/{id}/reset-password")
+    public ApiResponse<Void> resetPassword(@PathVariable Long id) {
+        userService.resetPassword(id);
+        return ApiResponse.success();
+    }
 }

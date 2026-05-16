@@ -68,7 +68,9 @@ const avatarText = computed(() => {
 })
 
 function handleCommand(cmd) {
-  if (cmd === 'logout') {
+  if (cmd === 'profile') {
+    router.push('/profile')
+  } else if (cmd === 'logout') {
     auth.clearAuth()
     router.push('/login')
   }

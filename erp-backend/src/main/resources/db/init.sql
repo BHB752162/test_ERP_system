@@ -62,6 +62,13 @@ CREATE TABLE sales_wechat (
     CONSTRAINT fk_wechat_sales FOREIGN KEY (sales_person_id) REFERENCES sys_user(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='销售微信号';
 
+-- sales_wechat 新增审计字段
+ALTER TABLE sales_wechat
+    ADD COLUMN created_by BIGINT DEFAULT NULL COMMENT '创建人',
+    ADD COLUMN updated_by BIGINT DEFAULT NULL COMMENT '更新人',
+    ADD INDEX idx_created_by (created_by),
+    ADD INDEX idx_updated_by (updated_by);
+
 -- ============================================
 -- 4. 客户主数据表
 -- ============================================
@@ -95,6 +102,8 @@ CREATE TABLE payment_channel_type (
     type_name   VARCHAR(100)    NOT NULL COMMENT '类型名称',
     sort_order  INT             NOT NULL DEFAULT 0 COMMENT '排序号',
     status      TINYINT         NOT NULL DEFAULT 1 COMMENT '0=停用 1=启用',
+    created_by  BIGINT          DEFAULT NULL COMMENT '创建人',
+    updated_by  BIGINT          DEFAULT NULL COMMENT '更新人',
     created_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at  DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -172,20 +181,22 @@ DROP TABLE IF EXISTS product;
 CREATE TABLE product (
     id              BIGINT          NOT NULL AUTO_INCREMENT,
     product_name    VARCHAR(200)    NOT NULL COMMENT '产品名称',
-    category_id     BIGINT          DEFAULT NULL COMMENT '分类ID',
+    product_type    VARCHAR(20)     NOT NULL DEFAULT 'SINGLE' COMMENT 'SINGLE=单品 SET=套装',
     product_code    VARCHAR(50)     DEFAULT NULL COMMENT 'SKU编号',
     description     TEXT            DEFAULT NULL COMMENT '描述',
     price           DECIMAL(10,2)   NOT NULL DEFAULT 0.00 COMMENT '销售单价',
     cost_price      DECIMAL(10,2)   DEFAULT 0.00 COMMENT '成本价',
     stock_quantity  INT             NOT NULL DEFAULT 0 COMMENT '库存数量',
     status          TINYINT         NOT NULL DEFAULT 1 COMMENT '0=下架 1=上架',
+    created_by      BIGINT          DEFAULT NULL COMMENT '创建人',
+    updated_by      BIGINT          DEFAULT NULL COMMENT '更新人',
     created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     UNIQUE KEY uk_product_code (product_code),
-    KEY idx_category_id (category_id),
     KEY idx_status (status),
-    CONSTRAINT fk_product_category FOREIGN KEY (category_id) REFERENCES product_category(id) ON DELETE SET NULL
+    KEY idx_created_by (created_by),
+    KEY idx_updated_by (updated_by)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产品';
 
 -- ============================================
@@ -275,6 +286,17 @@ CREATE TABLE customer_shipping_address (
     KEY idx_customer_id (customer_id),
     CONSTRAINT fk_shipping_address_customer FOREIGN KEY (customer_id) REFERENCES customer(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客户收件地址';
+
+-- product 表迁移：去掉分类，新增产品类型和审计字段
+ALTER TABLE product
+    DROP FOREIGN KEY fk_product_category,
+    DROP INDEX idx_category_id,
+    DROP COLUMN category_id,
+    ADD COLUMN product_type VARCHAR(20) NOT NULL DEFAULT 'SINGLE' COMMENT 'SINGLE=单品 SET=套装' AFTER product_name,
+    ADD COLUMN created_by BIGINT DEFAULT NULL COMMENT '创建人' AFTER status,
+    ADD COLUMN updated_by BIGINT DEFAULT NULL COMMENT '更新人' AFTER created_by,
+    ADD INDEX idx_created_by (created_by),
+    ADD INDEX idx_updated_by (updated_by);
 
 -- sales_order 新增字段
 ALTER TABLE sales_order

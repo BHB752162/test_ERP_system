@@ -113,6 +113,12 @@ const routes = [
         name: 'ChannelTypeList',
         component: () => import('../views/channel-type/ChannelTypeList.vue'),
         meta: { title: '渠道类型', roles: ['ADMIN', 'SALES_MANAGER'] }
+      },
+      {
+        path: 'profile',
+        name: 'Profile',
+        component: () => import('../views/profile/Profile.vue'),
+        meta: { title: '个人信息' }
       }
     ]
   }

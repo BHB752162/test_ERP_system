@@ -53,6 +53,12 @@ export const CHANNEL_TYPE_MAP = {
   OTHER: '其他'
 }
 
+// 产品类型映射
+export const PRODUCT_TYPE_MAP = {
+  SINGLE: { label: '单品', type: '' },
+  SET: { label: '套装', type: 'success' }
+}
+
 // 角色编码映射
 export const ROLE_CODE_MAP = {
   ADMIN: { label: '管理员', type: 'danger' },

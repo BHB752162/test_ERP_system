@@ -20,6 +20,10 @@ export function deleteUser(id) {
   return request.delete(`/users/${id}`)
 }
 
+export function resetPassword(id) {
+  return request.put(`/users/${id}/reset-password`)
+}
+
 export function listRoles() {
   return request.get('/roles')
 }

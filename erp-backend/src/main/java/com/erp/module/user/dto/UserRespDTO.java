@@ -14,5 +14,10 @@ public class UserRespDTO {
     private Long roleId;
     private String roleName;
     private String roleCode;
+    private Long createdBy;
+    private Long updatedBy;
+    private String createdByName;
+    private String updatedByName;
     private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 }

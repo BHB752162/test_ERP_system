@@ -11,4 +11,5 @@ public interface UserService {
     void updateUser(Long id, UserReqDTO req);
     void updateStatus(Long id, Integer status);
     void deleteUser(Long id);
+    void resetPassword(Long id);
 }

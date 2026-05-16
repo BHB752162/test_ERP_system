@@ -87,6 +87,10 @@ export function useDialogForm(createApi, updateApi, onSuccess) {
   function openCreate() {
     isEdit.value = false
     editId.value = null
+    // 清除可能残留的编辑数据
+    for (const key in formData) {
+      delete formData[key]
+    }
     if (formRef.value) formRef.value.resetFields()
     dialogVisible.value = true
   }
