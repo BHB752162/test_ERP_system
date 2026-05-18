@@ -24,5 +24,7 @@ public class ProductReqDTO {
 
     private Integer stockQuantity;
 
+    private Long parentId;
+
     private Integer status;
 }

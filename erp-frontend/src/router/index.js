@@ -61,12 +61,6 @@ const routes = [
         meta: { title: '编辑产品', roles: ['ADMIN', 'SALES_MANAGER'] }
       },
       {
-        path: 'categories',
-        name: 'CategoryList',
-        component: () => import('../views/product/CategoryList.vue'),
-        meta: { title: '产品分类', roles: ['ADMIN', 'SALES_MANAGER'] }
-      },
-      {
         path: 'orders',
         name: 'OrderList',
         component: () => import('../views/order/OrderList.vue'),
@@ -107,6 +101,12 @@ const routes = [
         name: 'AuditLogList',
         component: () => import('../views/audit/AuditLog.vue'),
         meta: { title: '审批日志' }
+      },
+      {
+        path: 'sales-accounts',
+        name: 'SalesAccountList',
+        component: () => import('../views/sales-account/SalesAccountList.vue'),
+        meta: { title: '销售账户管理', roles: ['ADMIN', 'SALES_MANAGER'] }
       },
       {
         path: 'channel-types',

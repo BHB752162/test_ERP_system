@@ -31,10 +31,7 @@
             <StatusTag :status="row.productType" :map="PRODUCT_TYPE_MAP" />
           </template>
         </el-table-column>
-        <el-table-column prop="price" label="单价" width="100" align="right">
-          <template #default="{ row }">¥{{ row.price }}</template>
-        </el-table-column>
-        <el-table-column prop="stockQuantity" label="库存" width="80" align="right" />
+<el-table-column prop="stockQuantity" label="库存" width="80" align="right" />
         <el-table-column prop="status" label="状态" width="80">
           <template #default="{ row }">
             <StatusTag :status="row.status" :map="ENABLE_STATUS_MAP" />

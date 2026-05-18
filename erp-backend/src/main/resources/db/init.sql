@@ -158,30 +158,14 @@ CREATE TABLE customer_contact (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客户联系人';
 
 -- ============================================
--- 8. 产品分类表
--- ============================================
-DROP TABLE IF EXISTS product_category;
-CREATE TABLE product_category (
-    id              BIGINT          NOT NULL AUTO_INCREMENT,
-    category_name   VARCHAR(100)    NOT NULL COMMENT '分类名称',
-    parent_id       BIGINT          DEFAULT NULL COMMENT '父分类ID，NULL为顶级',
-    sort_order      INT             NOT NULL DEFAULT 0 COMMENT '排序号',
-    status          TINYINT         NOT NULL DEFAULT 1 COMMENT '0=停用 1=启用',
-    created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    KEY idx_parent_id (parent_id),
-    CONSTRAINT fk_category_parent FOREIGN KEY (parent_id) REFERENCES product_category(id) ON DELETE SET NULL
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产品分类';
-
--- ============================================
--- 9. 产品表
+-- 8. 产品表
 -- ============================================
 DROP TABLE IF EXISTS product;
 CREATE TABLE product (
     id              BIGINT          NOT NULL AUTO_INCREMENT,
     product_name    VARCHAR(200)    NOT NULL COMMENT '产品名称',
     product_type    VARCHAR(20)     NOT NULL DEFAULT 'SINGLE' COMMENT 'SINGLE=单品 SET=套装',
+    parent_id       BIGINT          DEFAULT NULL COMMENT '父套装ID',
     product_code    VARCHAR(50)     DEFAULT NULL COMMENT 'SKU编号',
     description     TEXT            DEFAULT NULL COMMENT '描述',
     price           DECIMAL(10,2)   NOT NULL DEFAULT 0.00 COMMENT '销售单价',
@@ -298,6 +282,11 @@ ALTER TABLE product
     ADD INDEX idx_created_by (created_by),
     ADD INDEX idx_updated_by (updated_by);
 
+-- product 表新增父套装ID字段
+ALTER TABLE product
+    ADD COLUMN parent_id BIGINT DEFAULT NULL COMMENT '父套装ID' AFTER product_type,
+    ADD INDEX idx_parent_id (parent_id);
+
 -- sales_order 新增字段
 ALTER TABLE sales_order
     ADD COLUMN shipping_address_id BIGINT DEFAULT NULL COMMENT '收件地址ID',
@@ -331,6 +320,41 @@ CREATE TABLE customer_wechat_binding (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='微信号-客户绑定关系';
 
 -- ============================================
+-- 15. 销售账户表
+-- ============================================
+DROP TABLE IF EXISTS sales_account;
+CREATE TABLE sales_account (
+    id              BIGINT          NOT NULL AUTO_INCREMENT,
+    account_name    VARCHAR(100)    NOT NULL COMMENT '销售账户',
+    display_name    VARCHAR(200)    DEFAULT NULL COMMENT '销售账户名称',
+    account_type    VARCHAR(50)     NOT NULL DEFAULT 'WECHAT' COMMENT '账户类型 WECHAT=微信',
+    status          TINYINT         NOT NULL DEFAULT 1 COMMENT '0=禁用 1=启用',
+    created_by      BIGINT          DEFAULT NULL COMMENT '创建人',
+    updated_by      BIGINT          DEFAULT NULL COMMENT '更新人',
+    created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_created_by (created_by),
+    KEY idx_updated_by (updated_by)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='销售账户';
+
+-- ============================================
+-- 16. 销售账户-用户绑定关系表
+-- ============================================
+DROP TABLE IF EXISTS sales_account_user_binding;
+CREATE TABLE sales_account_user_binding (
+    id              BIGINT NOT NULL AUTO_INCREMENT,
+    sales_account_id BIGINT NOT NULL COMMENT '销售账户ID',
+    user_id         BIGINT NOT NULL COMMENT '用户ID',
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_account_user (sales_account_id, user_id),
+    KEY idx_user_id (user_id),
+    CONSTRAINT fk_sa_binding_account FOREIGN KEY (sales_account_id) REFERENCES sales_account(id) ON DELETE CASCADE,
+    CONSTRAINT fk_sa_binding_user FOREIGN KEY (user_id) REFERENCES sys_user(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='销售账户-用户绑定关系';
+
+-- ============================================
 -- 种子数据
 -- ============================================
 
@@ -340,13 +364,4 @@ INSERT INTO sys_role (role_name, role_code, description) VALUES
 ('销售经理', 'SALES_MANAGER', '销售经理，可审批订单、管理绑定'),
 ('销售人员', 'SALES_PERSON', '销售人员，可下单和管理自己的客户');
 
--- 插入测试产品分类
 -- 注意：管理员账号由应用启动时的 DataInitializer 自动创建（admin/admin123）
-INSERT INTO product_category (category_name, parent_id, sort_order) VALUES
-('电子产品', NULL, 1),
-('服装鞋帽', NULL, 2),
-('食品饮料', NULL, 3),
-('手机', 1, 1),
-('电脑', 1, 2),
-('男装', 2, 1),
-('女装', 2, 2);

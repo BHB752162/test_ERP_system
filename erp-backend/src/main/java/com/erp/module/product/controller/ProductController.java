@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
 import javax.validation.Valid;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/products")
@@ -33,9 +34,9 @@ public class ProductController {
     }
 
     @PostMapping
-    public ApiResponse<Void> create(@Valid @RequestBody ProductReqDTO req) {
-        productService.create(req);
-        return ApiResponse.success();
+    public ApiResponse<Long> create(@Valid @RequestBody ProductReqDTO req) {
+        Long id = productService.create(req);
+        return ApiResponse.success(id);
     }
 
     @PutMapping("/{id}")
@@ -47,6 +48,22 @@ public class ProductController {
     @DeleteMapping("/{id}")
     public ApiResponse<Void> delete(@PathVariable Long id) {
         productService.delete(id);
+        return ApiResponse.success();
+    }
+
+    @GetMapping("/sets")
+    public ApiResponse<List<Product>> listSets() {
+        return ApiResponse.success(productService.listSets());
+    }
+
+    @GetMapping("/{id}/children")
+    public ApiResponse<List<Product>> listChildren(@PathVariable Long id) {
+        return ApiResponse.success(productService.listChildren(id));
+    }
+
+    @PutMapping("/{id}/children")
+    public ApiResponse<Void> updateChildren(@PathVariable Long id, @RequestBody List<Long> childIds) {
+        productService.updateChildren(id, childIds);
         return ApiResponse.success();
     }
 }

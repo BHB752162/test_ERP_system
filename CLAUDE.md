@@ -8,7 +8,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **后端**: Spring Boot 2.7.18 + MyBatis-Plus 3.5.3.1 + Spring Security + JWT (jjwt 0.11.5), JDK 17
 - **前端**: Vue 3.4 + Vite 5 + Element Plus 2.5 + Pinia 2.1 + Vue Router 4.3 + Axios 1.6
-- **数据库**: MySQL 8.0+, 14 张 InnoDB 表 + 1 个 ALTER TABLE, utf8mb4
+- **数据库**: MySQL 8.0+, 15 张 InnoDB 表 + 4 个 ALTER TABLE, utf8mb4
 - **项目路径**: `E:\project\test_ERP_system\`
 
 ## Run Commands
@@ -42,11 +42,12 @@ cd E:/project/test_ERP_system/erp-frontend && npm run dev
 
 | 模块 | 数据库表 | 说明 |
 |------|---------|------|
-| `auth` | — | 登录, 获取用户信息 |
-| `user` + `role` | sys_user, sys_role | ADMIN 可用 |
+| `auth` | — | 登录, 获取用户信息, 个人信息编辑, 修改密码 |
+| `user` + `role` | sys_user, sys_role | 用户管理 (ADMIN); 工号/姓名/手机/邮箱/角色/状态; 密码重置; 审计字段(创建/更新人) |
+| `salesaccount` | sales_account | 销售账户管理, 增改查, 账户类型(微信等) |
 | `wechat` | sales_wechat | 销售微信号 CRUD, 一个销售可多个 |
-| `customer` | customer, customer_payment_channel, customer_contact, customer_shipping_address, payment_channel_type | 顾客信息 + 付款渠道 + 联系人 + 收件地址 + 渠道类型管理 |
-| `product` | product, product_category | 产品 + 分类树 |
+| `customer` | customer, customer_payment_channel, customer_contact, customer_shipping_address, payment_channel_type | 顾客信息 + 付款渠道 + 联系人 + 收件地址 + 渠道类型管理(含审计字段) |
+| `product` | product | 产品（分类已移除） |
 | `binding` | customer_wechat_binding | 微信号↔顾客多对多绑定 |
 | `order` | sales_order, sales_order_item | 下单 + 审批工作流 |
 | `audit` | order_audit_log | 审批日志查询 |
@@ -59,16 +60,22 @@ cd E:/project/test_ERP_system/erp-frontend && npm run dev
 | 联系人 | `/api/customers/{cid}/contacts` | CRUD |
 | 收件地址 | `/api/customers/{cid}/shipping-addresses` | CRUD, 默认地址互斥 |
 | 渠道类型 | `/api/payment-channel-types` | 独立CRUD, POST/PUT/DELETE仅 ADMIN/MANAGER |
+| 销售账户 | `/api/sales-accounts` | 独立CRUD, ADMIN/MANAGER |
 
 ### Security Rules (SecurityConfig.java + @PreAuthorize)
 
 ```
-POST /api/auth/login        → permitAll
-/api/users/**, /api/roles/** → hasRole('ADMIN')
-/api/sales-bindings/**       → hasAnyRole('ADMIN', 'SALES_MANAGER')
-/api/orders/*/approve|reject → hasAnyRole('ADMIN', 'SALES_MANAGER')
+POST /api/auth/login            → permitAll
+GET /api/auth/user-info         → authenticated (获取个人信息)
+PUT /api/auth/user-info         → authenticated (更新个人信息)
+POST /api/auth/change-password  → authenticated (修改密码, 需原密码)
+POST /api/auth/verify-password  → authenticated (验证原密码)
+/api/users/**, /api/roles/**    → hasRole('ADMIN')
+/api/sales-bindings/**          → hasAnyRole('ADMIN', 'SALES_MANAGER')
+/api/orders/*/approve|reject    → hasAnyRole('ADMIN', 'SALES_MANAGER')
+/api/sales-accounts/**          → hasAnyRole('ADMIN', 'SALES_MANAGER')
 POST/PUT/DELETE /api/payment-channel-types → @PreAuthorize("hasAnyRole('ADMIN', 'SALES_MANAGER')")
-所有其他 /api/**            → authenticated
+所有其他 /api/**                → authenticated
 无状态会话, JWT 过滤器在 UsernamePasswordAuthenticationFilter 之前
 ```
 
@@ -93,14 +100,24 @@ DRAFT / PENDING_APPROVAL → (取消) → CANCELLED
 - **`router/`** — 路由懒加载 + 导航守卫 (未登录→/login; 角色不够→/dashboard)
 - **`store/`** — Pinia auth store (token 持久化到 localStorage)
 - **`layout/`** — AppLayout (Sidebar + Navbar + router-view)
-- **`views/`** — 每个功能一个文件夹, 按功能拆分列表/表单/详情
+- **`views/`** — 每个功能一个文件夹, 按功能拆分列表/表单/详情; 另含 `profile/` (个人信息), `channel-type/` (渠道类型管理)
 - **`components/`** — Pagination, StatusTag 全局组件
 
 ### Frontend Pattern
 
 - `request.js` 拦截器: 请求加 `Authorization: Bearer` header; 响应处理统一错误弹窗, 401 自动跳转登录
 - `router/index.js` navigation guard: 检查 token 和 meta.roles
-- `Sidebar.vue` 菜单项: "系统管理"子菜单含"渠道类型"+"用户管理(仅ADMIN)"
+- `Sidebar.vue` 菜单顺序: 仪表盘 → 订单管理 → 顾客管理 → 微信号管理 → 产品管理 → 系统管理(销售账户管理+渠道类型+用户管理) → 审批管理
+- `Navbar.vue` 头像下拉: "个人信息"跳转 /profile
+- 用户管理页: 工号代替用户名, 含创建人/更新人/更新时间审计列, 操作列含编辑/重置密码/删除
+
+### Audit Pattern
+
+多数表包含审计字段: `created_by` (BIGINT), `updated_by` (BIGINT), `created_at`, `updated_at`。在后端 Service 中通过 `SecurityUtils.getCurrentUserId()` 手动设置，配合批量查询 (`sysUserMapper.selectBatchIds`) 加载 `createdByName`/`updatedByName` 用于前端展示。DTO 中通过 `@TableField(exist = false)` 标记瞬态姓名字段。
+
+### 销售账户绑定
+
+销售账户通过 `sales_account_user_binding` 与 `sys_user` 多对多关联。编辑销售账户时可在弹窗中绑定/解绑用户，绑定的用户即为可使用该账户的销售人员。
 
 ### Key Data Relationships
 

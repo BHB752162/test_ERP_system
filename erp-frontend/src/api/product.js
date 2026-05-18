@@ -20,23 +20,14 @@ export function deleteProduct(id) {
   return request.delete(`/products/${id}`)
 }
 
-// Categories
-export function listCategories() {
-  return request.get('/product-categories/tree')
+export function listSets() {
+  return request.get('/products/sets')
 }
 
-export function getCategory(id) {
-  return request.get(`/product-categories/${id}`)
+export function listChildren(id) {
+  return request.get(`/products/${id}/children`)
 }
 
-export function createCategory(data) {
-  return request.post('/product-categories', data)
-}
-
-export function updateCategory(id, data) {
-  return request.put(`/product-categories/${id}`, data)
-}
-
-export function deleteCategory(id) {
-  return request.delete(`/product-categories/${id}`)
+export function updateChildren(id, childIds) {
+  return request.put(`/products/${id}/children`, childIds)
 }

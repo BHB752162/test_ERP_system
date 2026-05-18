@@ -14,6 +14,7 @@ import com.erp.security.SecurityUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.*;
@@ -54,6 +55,20 @@ public class ProductServiceImpl implements ProductService {
                 if (p.getUpdatedBy() != null) p.setUpdatedByName(userMap.get(p.getUpdatedBy()));
             }
         }
+
+        // Batch load parent names for SINGLE products
+        Set<Long> parentIds = records.stream()
+                .map(Product::getParentId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+        if (!parentIds.isEmpty()) {
+            Map<Long, String> parentMap = productMapper.selectBatchIds(parentIds)
+                    .stream().collect(Collectors.toMap(Product::getId, Product::getProductName));
+            for (Product p : records) {
+                if (p.getParentId() != null) p.setParentName(parentMap.get(p.getParentId()));
+            }
+        }
+
         return pageResult;
     }
 
@@ -65,7 +80,7 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
-    public void create(ProductReqDTO req) {
+    public Long create(ProductReqDTO req) {
         Product product = new Product();
         BeanUtils.copyProperties(req, product);
         if (product.getStatus() == null) product.setStatus(1);
@@ -74,6 +89,7 @@ public class ProductServiceImpl implements ProductService {
         product.setCreatedBy(userId);
         product.setUpdatedBy(userId);
         productMapper.insert(product);
+        return product.getId();
     }
 
     @Override
@@ -89,7 +105,51 @@ public class ProductServiceImpl implements ProductService {
     public void delete(Long id) {
         Product product = productMapper.selectById(id);
         if (product == null) throw new BusinessException("产品不存在");
+        // 如果有子产品（单品引用了该套装），解除引用
+        Product update = new Product();
+        update.setParentId(null);
+        productMapper.update(update, new LambdaQueryWrapper<Product>().eq(Product::getParentId, id));
         product.setStatus(0);
         productMapper.updateById(product);
+    }
+
+    @Override
+    public List<Product> listSets() {
+        LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Product::getProductType, "SET")
+                .ne(Product::getStatus, 0)
+                .orderByDesc(Product::getCreatedAt);
+        return productMapper.selectList(wrapper);
+    }
+
+    @Override
+    public List<Product> listChildren(Long parentId) {
+        LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(Product::getParentId, parentId)
+                .ne(Product::getStatus, 0)
+                .orderByDesc(Product::getCreatedAt);
+        return productMapper.selectList(wrapper);
+    }
+
+    @Override
+    @Transactional
+    public void updateChildren(Long parentId, List<Long> childIds) {
+        Product parent = productMapper.selectById(parentId);
+        if (parent == null) throw new BusinessException("父产品不存在");
+
+        // 清除所有原有引用到此父产品的子产品
+        Product clear = new Product();
+        clear.setParentId(null);
+        productMapper.update(clear, new LambdaQueryWrapper<Product>().eq(Product::getParentId, parentId));
+
+        // 设置新的子产品
+        if (childIds != null && !childIds.isEmpty()) {
+            for (Long childId : childIds) {
+                Product child = productMapper.selectById(childId);
+                if (child == null) throw new BusinessException("子产品ID " + childId + " 不存在");
+                child.setParentId(parentId);
+                productMapper.updateById(child);
+            }
+        }
     }
 }

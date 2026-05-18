@@ -62,6 +62,7 @@ public class SecurityConfig {
                 .antMatchers("/api/roles/**").hasRole("ADMIN")
                 .antMatchers(HttpMethod.GET, "/api/sales-bindings/**").authenticated()
                 .antMatchers("/api/sales-bindings/**").hasAnyRole("ADMIN", "SALES_MANAGER")
+                .antMatchers("/api/sales-accounts/**").hasAnyRole("ADMIN", "SALES_MANAGER")
                 .antMatchers("/api/orders/*/approve", "/api/orders/*/reject").hasAnyRole("ADMIN", "SALES_MANAGER")
                 .anyRequest().authenticated()
             .and()

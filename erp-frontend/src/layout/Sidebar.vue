@@ -73,10 +73,6 @@
           <el-icon><Menu /></el-icon>
           <span>产品列表</span>
         </el-menu-item>
-        <el-menu-item index="/categories">
-          <el-icon><FolderOpened /></el-icon>
-          <span>产品分类</span>
-        </el-menu-item>
       </el-sub-menu>
 
       <el-sub-menu v-if="auth.hasAnyRole(['ADMIN', 'SALES_MANAGER'])" index="system">
@@ -84,6 +80,10 @@
           <el-icon><Setting /></el-icon>
           <span>系统管理</span>
         </template>
+        <el-menu-item index="/sales-accounts">
+          <el-icon><Avatar /></el-icon>
+          <span>销售账户管理</span>
+        </el-menu-item>
         <el-menu-item index="/channel-types">
           <el-icon><Coin /></el-icon>
           <span>渠道类型</span>
@@ -122,8 +122,8 @@ const openedMenus = computed(() => {
   if (path.startsWith('/orders')) return ['order']
   if (path.startsWith('/customers')) return ['customer']
   if (path.startsWith('/wechats') || path.startsWith('/bindings')) return ['wechat']
-  if (path.startsWith('/products') || path.startsWith('/categories')) return ['product']
-  if (path.startsWith('/channel-types') || path.startsWith('/users')) return ['system']
+  if (path.startsWith('/products')) return ['product']
+  if (path.startsWith('/channel-types') || path.startsWith('/users') || path.startsWith('/sales-accounts')) return ['system']
   if (path.startsWith('/audit')) return ['audit']
   return []
 })
