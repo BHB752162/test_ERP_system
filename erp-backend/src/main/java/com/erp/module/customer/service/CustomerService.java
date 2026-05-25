@@ -13,9 +13,9 @@ import com.erp.module.customer.entity.CustomerShippingAddress;
 import java.util.List;
 
 public interface CustomerService {
-    IPage<Customer> listCustomers(int page, int pageSize, String keyword);
+    IPage<Customer> listCustomers(int page, int pageSize, String keyword, Long userId, String roleCode);
     Customer getById(Long id);
-    void create(CustomerReqDTO req, Long createdBy);
+    Long create(CustomerReqDTO req, Long createdBy);
     void update(Long id, CustomerReqDTO req);
     void delete(Long id);
 

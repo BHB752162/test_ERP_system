@@ -1,6 +1,7 @@
 package com.erp.module.order.dto;
 
 import com.erp.module.order.entity.SalesOrderItem;
+import com.erp.module.order.entity.SalesOrderPayment;
 import lombok.Data;
 
 import java.math.BigDecimal;
@@ -15,9 +16,9 @@ public class OrderRespDTO {
     private String customerName;
     private Long salesPersonId;
     private String salesPersonName;
-    private Long salesWechatId;
-    private String salesWechatAccount;
-    private String salesWechatNickname;
+    private Long salesAccountId;
+    private String salesAccountName;
+    private String salesAccountDisplayName;
     private BigDecimal totalAmount;
     private BigDecimal discountAmount;
     private BigDecimal finalAmount;
@@ -26,6 +27,7 @@ public class OrderRespDTO {
     private String tag;
     private String mallOrderInfo;
     private String remark;
+    private List<SalesOrderPayment> payments;
     private Long shippingAddressId;
     private String recipientName;
     private String recipientPhone;

@@ -12,10 +12,10 @@ export function unbind(id) {
   return request.delete(`/sales-bindings/${id}`)
 }
 
-export function getBoundCustomers(wechatId) {
-  return request.get(`/sales-bindings/bound-customers?wechatId=${wechatId}`)
+export function getBoundCustomers(salesAccountId) {
+  return request.get(`/sales-bindings/bound-customers?salesAccountId=${salesAccountId}`)
 }
 
-export function getBoundWechats(customerId) {
-  return request.get(`/sales-bindings/bound-wechats?customerId=${customerId}`)
+export function getBoundAccounts(customerId) {
+  return request.get(`/sales-bindings/bound-accounts?customerId=${customerId}`)
 }

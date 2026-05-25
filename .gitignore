@@ -24,6 +24,12 @@ Thumbs.db
 .env
 .env.local
 
+# Temp / sensitive files
+token.txt
+login*.json
+*_resp.txt
+export_test.xlsx
+
 # Claude
 .claude/settings.json
 .claude/history.jsonl

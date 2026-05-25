@@ -6,109 +6,126 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.erp.common.exception.BusinessException;
 import com.erp.module.binding.dto.BindingReqDTO;
 import com.erp.module.binding.dto.BindingRespDTO;
-import com.erp.module.binding.entity.CustomerWechatBinding;
-import com.erp.module.binding.mapper.CustomerWechatBindingMapper;
+import com.erp.module.binding.entity.CustomerSalesAccountBinding;
+import com.erp.module.binding.mapper.CustomerSalesAccountBindingMapper;
 import com.erp.module.binding.service.BindingService;
 import com.erp.module.customer.entity.Customer;
 import com.erp.module.customer.mapper.CustomerMapper;
-import com.erp.module.wechat.entity.SalesWechat;
-import com.erp.module.wechat.mapper.SalesWechatMapper;
-import com.erp.module.user.entity.SysUser;
-import com.erp.module.user.mapper.SysUserMapper;
+import com.erp.module.salesaccount.entity.SalesAccount;
+import com.erp.module.salesaccount.entity.SalesAccountUserBinding;
+import com.erp.module.salesaccount.mapper.SalesAccountMapper;
+import com.erp.module.salesaccount.mapper.SalesAccountUserBindingMapper;
+import com.erp.security.SecurityUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class BindingServiceImpl implements BindingService {
 
     @Resource
-    private CustomerWechatBindingMapper bindingMapper;
+    private CustomerSalesAccountBindingMapper bindingMapper;
 
     @Resource
-    private SalesWechatMapper salesWechatMapper;
+    private SalesAccountMapper salesAccountMapper;
+
+    @Resource
+    private SalesAccountUserBindingMapper salesAccountUserBindingMapper;
 
     @Resource
     private CustomerMapper customerMapper;
 
-    @Resource
-    private SysUserMapper sysUserMapper;
-
     @Override
-    public IPage<BindingRespDTO> listAll(Long wechatId, Long customerId, Integer page, Integer pageSize) {
-        LambdaQueryWrapper<CustomerWechatBinding> wrapper = new LambdaQueryWrapper<CustomerWechatBinding>()
-                .ne(CustomerWechatBinding::getStatus, 0)
-                .orderByDesc(CustomerWechatBinding::getCreatedAt);
-        if (wechatId != null) {
-            wrapper.eq(CustomerWechatBinding::getSalesWechatId, wechatId);
+    public IPage<BindingRespDTO> listAll(Long salesAccountId, Long customerId, Integer page, Integer pageSize) {
+        LambdaQueryWrapper<CustomerSalesAccountBinding> wrapper = new LambdaQueryWrapper<CustomerSalesAccountBinding>()
+                .orderByDesc(CustomerSalesAccountBinding::getCreatedAt);
+        if (salesAccountId != null) {
+            wrapper.eq(CustomerSalesAccountBinding::getSalesAccountId, salesAccountId);
         }
         if (customerId != null) {
-            wrapper.eq(CustomerWechatBinding::getCustomerId, customerId);
+            wrapper.eq(CustomerSalesAccountBinding::getCustomerId, customerId);
         }
-        IPage<CustomerWechatBinding> pageResult = bindingMapper.selectPage(new Page<>(page, pageSize), wrapper);
+        IPage<CustomerSalesAccountBinding> pageResult = bindingMapper.selectPage(new Page<>(page, pageSize), wrapper);
         return pageResult.convert(this::toRespDTO);
     }
 
     @Override
     public void create(BindingReqDTO req) {
-        long count = bindingMapper.selectCount(
-                new LambdaQueryWrapper<CustomerWechatBinding>()
-                        .eq(CustomerWechatBinding::getSalesWechatId, req.getSalesWechatId())
-                        .eq(CustomerWechatBinding::getCustomerId, req.getCustomerId())
-                        .eq(CustomerWechatBinding::getStatus, 1));
-        if (count > 0) throw new BusinessException("该绑定关系已存在");
+        // Check duplicate
+        Long count = bindingMapper.selectCount(
+                new LambdaQueryWrapper<CustomerSalesAccountBinding>()
+                        .eq(CustomerSalesAccountBinding::getSalesAccountId, req.getSalesAccountId())
+                        .eq(CustomerSalesAccountBinding::getCustomerId, req.getCustomerId()));
+        if (count > 0) throw new BusinessException("该顾客已绑定此销售账户");
 
-        CustomerWechatBinding binding = new CustomerWechatBinding();
-        binding.setSalesWechatId(req.getSalesWechatId());
+        // Verify sales account exists
+        SalesAccount account = salesAccountMapper.selectById(req.getSalesAccountId());
+        if (account == null) throw new BusinessException("销售账户不存在");
+
+        // Verify customer exists
+        Customer customer = customerMapper.selectById(req.getCustomerId());
+        if (customer == null) throw new BusinessException("顾客不存在");
+
+        CustomerSalesAccountBinding binding = new CustomerSalesAccountBinding();
+        binding.setSalesAccountId(req.getSalesAccountId());
         binding.setCustomerId(req.getCustomerId());
-        binding.setStatus(1);
         bindingMapper.insert(binding);
     }
 
     @Override
+    public void createSelfBinding(BindingReqDTO req) {
+        Long currentUserId = SecurityUtils.getCurrentUserId();
+        if (currentUserId == null) throw new BusinessException("未登录");
+
+        // ADMIN can bind any account; non-ADMIN is restricted to their own accounts
+        if (!SecurityUtils.hasRole("ADMIN")) {
+            Long bindingCount = salesAccountUserBindingMapper.selectCount(
+                    new LambdaQueryWrapper<SalesAccountUserBinding>()
+                            .eq(SalesAccountUserBinding::getSalesAccountId, req.getSalesAccountId())
+                            .eq(SalesAccountUserBinding::getUserId, currentUserId));
+            if (bindingCount == 0) throw new BusinessException("您没有权限操作此销售账户");
+        }
+
+        // Delegate to regular create
+        create(req);
+    }
+
+    @Override
     public void unbind(Long id) {
-        CustomerWechatBinding binding = bindingMapper.selectById(id);
-        if (binding == null) throw new BusinessException("绑定关系不存在");
-        binding.setStatus(0);
-        bindingMapper.updateById(binding);
+        if (bindingMapper.deleteById(id) == 0) throw new BusinessException("绑定关系不存在");
     }
 
     @Override
-    public List<BindingRespDTO> listBoundCustomersByWechat(Long wechatId) {
-        List<CustomerWechatBinding> bindings = bindingMapper.selectList(
-                new LambdaQueryWrapper<CustomerWechatBinding>()
-                        .eq(CustomerWechatBinding::getSalesWechatId, wechatId)
-                        .eq(CustomerWechatBinding::getStatus, 1));
+    public List<BindingRespDTO> listBoundCustomersByAccount(Long salesAccountId) {
+        List<CustomerSalesAccountBinding> bindings = bindingMapper.selectList(
+                new LambdaQueryWrapper<CustomerSalesAccountBinding>()
+                        .eq(CustomerSalesAccountBinding::getSalesAccountId, salesAccountId));
         return bindings.stream().map(this::toRespDTO).collect(Collectors.toList());
     }
 
     @Override
-    public List<BindingRespDTO> listBoundWechatsByCustomer(Long customerId) {
-        List<CustomerWechatBinding> bindings = bindingMapper.selectList(
-                new LambdaQueryWrapper<CustomerWechatBinding>()
-                        .eq(CustomerWechatBinding::getCustomerId, customerId)
-                        .eq(CustomerWechatBinding::getStatus, 1));
+    public List<BindingRespDTO> listBoundAccountsByCustomer(Long customerId) {
+        List<CustomerSalesAccountBinding> bindings = bindingMapper.selectList(
+                new LambdaQueryWrapper<CustomerSalesAccountBinding>()
+                        .eq(CustomerSalesAccountBinding::getCustomerId, customerId));
         return bindings.stream().map(this::toRespDTO).collect(Collectors.toList());
     }
 
-    private BindingRespDTO toRespDTO(CustomerWechatBinding binding) {
+    private BindingRespDTO toRespDTO(CustomerSalesAccountBinding binding) {
         BindingRespDTO dto = new BindingRespDTO();
         dto.setId(binding.getId());
-        dto.setSalesWechatId(binding.getSalesWechatId());
+        dto.setSalesAccountId(binding.getSalesAccountId());
         dto.setCustomerId(binding.getCustomerId());
-        dto.setStatus(binding.getStatus());
         dto.setCreatedAt(binding.getCreatedAt());
 
-        SalesWechat wechat = salesWechatMapper.selectById(binding.getSalesWechatId());
-        if (wechat != null) {
-            dto.setWechatAccount(wechat.getWechatAccount());
-            dto.setWechatNickname(wechat.getWechatNickname());
-            SysUser user = sysUserMapper.selectById(wechat.getSalesPersonId());
-            if (user != null) {
-                dto.setSalesPersonName(user.getRealName());
-            }
+        SalesAccount account = salesAccountMapper.selectById(binding.getSalesAccountId());
+        if (account != null) {
+            dto.setSalesAccountName(account.getAccountName());
+            dto.setSalesAccountDisplayName(account.getDisplayName());
         }
 
         Customer customer = customerMapper.selectById(binding.getCustomerId());

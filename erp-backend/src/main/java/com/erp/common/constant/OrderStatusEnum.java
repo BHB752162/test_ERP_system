@@ -1,12 +1,14 @@
 package com.erp.common.constant;
 
 public enum OrderStatusEnum {
-    DRAFT("草稿"),
+    SAVED("已保存"),
     PENDING_APPROVAL("待审批"),
-    APPROVED("已通过"),
+    APPROVED("已审批"),
+    SHIPPED("已发货"),
+    DELIVERED("已妥投"),
     REJECTED("已驳回"),
-    COMPLETED("已完成"),
-    CANCELLED("已取消");
+    CANCELLED("已取消"),
+    REFUNDED("已退款");
 
     private final String displayName;
 
@@ -20,12 +22,16 @@ public enum OrderStatusEnum {
 
     public static boolean canTransition(String currentStatus, String targetAction) {
         switch (currentStatus) {
-            case "DRAFT":
+            case "SAVED":
                 return "SUBMIT".equals(targetAction) || "CANCEL".equals(targetAction);
             case "PENDING_APPROVAL":
                 return "APPROVE".equals(targetAction) || "REJECT".equals(targetAction) || "CANCEL".equals(targetAction);
             case "APPROVED":
-                return "COMPLETE".equals(targetAction);
+                return "SHIP".equals(targetAction) || "REFUND".equals(targetAction);
+            case "SHIPPED":
+                return "DELIVER".equals(targetAction) || "REFUND".equals(targetAction);
+            case "DELIVERED":
+                return "REFUND".equals(targetAction);
             default:
                 return false;
         }
@@ -41,8 +47,12 @@ public enum OrderStatusEnum {
                 return "REJECTED";
             case "CANCEL":
                 return "CANCELLED";
-            case "COMPLETE":
-                return "COMPLETED";
+            case "SHIP":
+                return "SHIPPED";
+            case "DELIVER":
+                return "DELIVERED";
+            case "REFUND":
+                return "REFUNDED";
             default:
                 throw new IllegalArgumentException("未知操作: " + action);
         }

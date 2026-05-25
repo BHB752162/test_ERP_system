@@ -4,6 +4,8 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.erp.common.exception.BusinessException;
+import com.erp.module.binding.entity.CustomerSalesAccountBinding;
+import com.erp.module.binding.mapper.CustomerSalesAccountBindingMapper;
 import com.erp.module.customer.dto.CustomerContactReqDTO;
 import com.erp.module.customer.dto.CustomerReqDTO;
 import com.erp.module.customer.dto.PaymentChannelReqDTO;
@@ -17,12 +19,17 @@ import com.erp.module.customer.mapper.CustomerMapper;
 import com.erp.module.customer.mapper.CustomerPaymentChannelMapper;
 import com.erp.module.customer.mapper.CustomerShippingAddressMapper;
 import com.erp.module.customer.service.CustomerService;
+import com.erp.module.salesaccount.entity.SalesAccountUserBinding;
+import com.erp.module.salesaccount.mapper.SalesAccountUserBindingMapper;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 
 import javax.annotation.Resource;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class CustomerServiceImpl implements CustomerService {
@@ -39,14 +46,47 @@ public class CustomerServiceImpl implements CustomerService {
     @Resource
     private CustomerShippingAddressMapper shippingAddressMapper;
 
+    @Resource
+    private SalesAccountUserBindingMapper salesAccountUserBindingMapper;
+
+    @Resource
+    private CustomerSalesAccountBindingMapper customerSalesAccountBindingMapper;
+
     @Override
-    public IPage<Customer> listCustomers(int page, int pageSize, String keyword) {
+    public IPage<Customer> listCustomers(int page, int pageSize, String keyword, Long userId, String roleCode) {
         Page<Customer> pageParam = new Page<>(page, pageSize);
         LambdaQueryWrapper<Customer> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.isNotBlank(keyword)) {
             wrapper.like(Customer::getCustomerName, keyword)
                     .or().like(Customer::getPhone, keyword);
         }
+
+        // 销售只能看到其销售账户绑定的顾客
+        if (!"ADMIN".equals(roleCode)) {
+            List<Long> accountIds = salesAccountUserBindingMapper.selectList(
+                    new LambdaQueryWrapper<SalesAccountUserBinding>()
+                            .eq(SalesAccountUserBinding::getUserId, userId))
+                    .stream().map(SalesAccountUserBinding::getSalesAccountId)
+                    .collect(Collectors.toList());
+
+            if (accountIds.isEmpty()) {
+                wrapper.eq(Customer::getId, -1L);
+            } else {
+                List<Long> customerIds = customerSalesAccountBindingMapper.selectList(
+                        new LambdaQueryWrapper<CustomerSalesAccountBinding>()
+                                .in(CustomerSalesAccountBinding::getSalesAccountId, accountIds))
+                        .stream().map(CustomerSalesAccountBinding::getCustomerId)
+                        .distinct()
+                        .collect(Collectors.toList());
+
+                if (customerIds.isEmpty()) {
+                    wrapper.eq(Customer::getId, -1L);
+                } else {
+                    wrapper.in(Customer::getId, customerIds);
+                }
+            }
+        }
+
         wrapper.ne(Customer::getStatus, 0).orderByDesc(Customer::getCreatedAt);
         return customerMapper.selectPage(pageParam, wrapper);
     }
@@ -59,13 +99,15 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     @Override
-    public void create(CustomerReqDTO req, Long createdBy) {
+    public Long create(CustomerReqDTO req, Long createdBy) {
         Customer customer = new Customer();
         BeanUtils.copyProperties(req, customer);
         customer.setCreatedBy(createdBy);
         if (customer.getStatus() == null) customer.setStatus(1);
         if (customer.getLevel() == null) customer.setLevel(0);
+        setAddFriendTime(customer, req.getAddFriendTime());
         customerMapper.insert(customer);
+        return customer.getId();
     }
 
     @Override
@@ -73,7 +115,16 @@ public class CustomerServiceImpl implements CustomerService {
         Customer customer = customerMapper.selectById(id);
         if (customer == null) throw new BusinessException("客户不存在");
         BeanUtils.copyProperties(req, customer);
+        setAddFriendTime(customer, req.getAddFriendTime());
         customerMapper.updateById(customer);
+    }
+
+    private void setAddFriendTime(Customer customer, String addFriendTimeStr) {
+        if (StringUtils.isNotBlank(addFriendTimeStr)) {
+            customer.setAddFriendTime(LocalDateTime.parse(addFriendTimeStr + " 00:00:00", DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
+        } else {
+            customer.setAddFriendTime(null);
+        }
     }
 
     @Override

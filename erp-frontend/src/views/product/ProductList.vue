@@ -19,9 +19,10 @@
           <el-icon style="margin-right: 4px"><Plus /></el-icon> 新增产品
         </el-button>
       </div>
+      <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" style="margin-bottom: 16px" />
       <el-table :data="list" border stripe v-loading="loading">
         <template #empty>
-          <el-empty :description="query.keyword ? '没有找到匹配的产品' : '暂无产品数据'" />
+          <el-empty :description="error || (query.keyword ? '没有找到匹配的产品' : '暂无产品数据')" />
         </template>
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="productCode" label="SKU" width="120" />
@@ -67,7 +68,7 @@ import { ENABLE_STATUS_MAP, PRODUCT_TYPE_MAP } from '../../constants'
 import Pagination from '../../components/Pagination.vue'
 import StatusTag from '../../components/StatusTag.vue'
 
-const { list, total, loading, query, fetchData, search, reset, onPageChange } = useCrudList(listProducts, { defaultQuery: { keyword: '' } })
+const { list, total, loading, error, query, fetchData, search, reset, onPageChange } = useCrudList(listProducts, { defaultQuery: { keyword: '' } })
 const { handleDelete } = useDeleteAction(deleteProduct, fetchData)
 
 onMounted(fetchData)

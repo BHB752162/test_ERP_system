@@ -10,8 +10,8 @@ public class OrderCreateReqDTO {
     @NotNull(message = "客户不能为空")
     private Long customerId;
 
-    @NotNull(message = "微信号不能为空")
-    private Long salesWechatId;
+    @NotNull(message = "销售账户ID不能为空")
+    private Long salesAccountId;
 
     private String tag;
 
@@ -20,6 +20,9 @@ public class OrderCreateReqDTO {
     private String remark;
 
     private Long shippingAddressId;
+
+    @NotNull(message = "收款信息不能为空")
+    private List<PaymentItemReqDTO> payments;
 
     @NotNull(message = "订单项不能为空")
     private List<OrderItemReqDTO> items;
@@ -33,5 +36,14 @@ public class OrderCreateReqDTO {
         private Integer quantity;
 
         private BigDecimal unitPrice;
+    }
+
+    @Data
+    public static class PaymentItemReqDTO {
+        @NotNull(message = "收款渠道不能为空")
+        private Long paymentChannelTypeId;
+
+        @NotNull(message = "收款金额不能为空")
+        private BigDecimal paymentAmount;
     }
 }

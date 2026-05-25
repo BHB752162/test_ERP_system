@@ -28,10 +28,7 @@
           <el-icon><Menu /></el-icon>
           <span>订单列表</span>
         </el-menu-item>
-        <el-menu-item index="/orders/create">
-          <el-icon><Edit /></el-icon>
-          <span>创建订单</span>
-        </el-menu-item>
+
       </el-sub-menu>
 
       <el-sub-menu index="customer">
@@ -43,28 +40,9 @@
           <el-icon><Menu /></el-icon>
           <span>顾客列表</span>
         </el-menu-item>
-        <el-menu-item index="/customers/create">
-          <el-icon><Plus /></el-icon>
-          <span>新增顾客</span>
-        </el-menu-item>
       </el-sub-menu>
 
-      <el-sub-menu v-if="auth.hasAnyRole(['ADMIN', 'SALES_MANAGER'])" index="wechat">
-        <template #title>
-          <el-icon><ChatDotRound /></el-icon>
-          <span>微信号管理</span>
-        </template>
-        <el-menu-item index="/wechats">
-          <el-icon><Menu /></el-icon>
-          <span>微信号列表</span>
-        </el-menu-item>
-        <el-menu-item index="/bindings">
-          <el-icon><Link /></el-icon>
-          <span>绑定管理</span>
-        </el-menu-item>
-      </el-sub-menu>
-
-      <el-sub-menu v-if="auth.hasAnyRole(['ADMIN', 'SALES_MANAGER'])" index="product">
+      <el-sub-menu v-if="auth.hasAnyRole(['ADMIN'])" index="product">
         <template #title>
           <el-icon><Goods /></el-icon>
           <span>产品管理</span>
@@ -75,7 +53,7 @@
         </el-menu-item>
       </el-sub-menu>
 
-      <el-sub-menu v-if="auth.hasAnyRole(['ADMIN', 'SALES_MANAGER'])" index="system">
+      <el-sub-menu v-if="auth.hasAnyRole(['ADMIN'])" index="system">
         <template #title>
           <el-icon><Setting /></el-icon>
           <span>系统管理</span>
@@ -105,6 +83,17 @@
         </el-menu-item>
       </el-sub-menu>
 
+      <el-sub-menu v-if="auth.hasAnyRole(['ADMIN'])" index="admin-tools">
+        <template #title>
+          <el-icon><Tools /></el-icon>
+          <span>管理员工具</span>
+        </template>
+        <el-menu-item index="/admin-tools/tracking-import">
+          <el-icon><Van /></el-icon>
+          <span>运单号导入</span>
+        </el-menu-item>
+      </el-sub-menu>
+
     </el-menu>
   </el-aside>
 </template>
@@ -121,10 +110,10 @@ const openedMenus = computed(() => {
   const path = route.path
   if (path.startsWith('/orders')) return ['order']
   if (path.startsWith('/customers')) return ['customer']
-  if (path.startsWith('/wechats') || path.startsWith('/bindings')) return ['wechat']
   if (path.startsWith('/products')) return ['product']
   if (path.startsWith('/channel-types') || path.startsWith('/users') || path.startsWith('/sales-accounts')) return ['system']
   if (path.startsWith('/audit')) return ['audit']
+  if (path.startsWith('/admin-tools')) return ['admin-tools']
   return []
 })
 </script>

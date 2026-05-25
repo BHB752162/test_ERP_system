@@ -6,20 +6,15 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 @Data
-@TableName("customer_wechat_binding")
-public class CustomerWechatBinding {
+@TableName("customer_sales_account_binding")
+public class CustomerSalesAccountBinding {
     @TableId(type = IdType.AUTO)
     private Long id;
 
-    private Long salesWechatId;
-
     private Long customerId;
 
-    private Integer status;
+    private Long salesAccountId;
 
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
-
-    @TableField(fill = FieldFill.INSERT_UPDATE)
-    private LocalDateTime updatedAt;
 }

@@ -19,9 +19,10 @@
           <el-icon style="margin-right: 4px"><Plus /></el-icon> 新增用户
         </el-button>
       </div>
+      <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" style="margin-bottom: 16px" />
       <el-table :data="list" border stripe v-loading="loading">
         <template #empty>
-          <el-empty :description="query.keyword ? '没有找到匹配的用户' : '暂无用户数据'" />
+          <el-empty :description="error || (query.keyword ? '没有找到匹配的用户' : '暂无用户数据')" />
         </template>
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="username" label="工号" min-width="120" />
@@ -103,7 +104,7 @@ import { ENABLE_STATUS_MAP } from '../../constants'
 import Pagination from '../../components/Pagination.vue'
 import StatusTag from '../../components/StatusTag.vue'
 
-const { list, total, loading, query, fetchData, search, reset, onPageChange } = useCrudList(listUsers, { defaultQuery: { keyword: '' } })
+const { list, total, loading, error, query, fetchData, search, reset, onPageChange } = useCrudList(listUsers, { defaultQuery: { keyword: '' } })
 const { handleDelete } = useDeleteAction(deleteUser, fetchData)
 
 async function handleResetPwd(id) {

@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 import { login as loginApi, getUserInfo } from '../api/auth'
 
+const STORAGE_KEY = 'erp_auth'
+
 export const useAuthStore = defineStore('auth', () => {
   const token = ref(localStorage.getItem('token') || '')
   const userInfo = ref(null)
@@ -15,6 +17,7 @@ export const useAuthStore = defineStore('auth', () => {
     token.value = ''
     userInfo.value = null
     localStorage.removeItem('token')
+    localStorage.removeItem(STORAGE_KEY)
   }
 
   async function login(credentials) {
@@ -29,8 +32,11 @@ export const useAuthStore = defineStore('auth', () => {
       const res = await getUserInfo()
       userInfo.value = res.data
       return res.data
-    } catch {
-      clearAuth()
+    } catch (err) {
+      // 仅当 401 时才清除登录态，网络抖动等临时错误不登出
+      if (err?.response?.status === 401) {
+        clearAuth()
+      }
       return null
     }
   }
@@ -44,4 +50,10 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   return { token, userInfo, setToken, clearAuth, login, fetchUserInfo, hasRole, hasAnyRole }
+}, {
+  persist: {
+    key: STORAGE_KEY,
+    storage: localStorage,
+    paths: ['userInfo', 'token']
+  }
 })

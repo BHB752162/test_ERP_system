@@ -113,7 +113,6 @@ public class AuthServiceImpl implements AuthService {
     private String getRoleName(String roleCode) {
         switch (roleCode) {
             case "ADMIN": return "管理员";
-            case "SALES_MANAGER": return "销售经理";
             case "SALES_PERSON": return "销售人员";
             default: return "未知角色";
         }

@@ -59,7 +59,7 @@ public class SalesAccountServiceImpl implements SalesAccountService {
     }
 
     @Override
-    public void create(SalesAccountReqDTO req) {
+    public Long create(SalesAccountReqDTO req) {
         SalesAccount account = new SalesAccount();
         BeanUtils.copyProperties(req, account);
         if (account.getStatus() == null) account.setStatus(1);
@@ -67,6 +67,7 @@ public class SalesAccountServiceImpl implements SalesAccountService {
         account.setCreatedBy(userId);
         account.setUpdatedBy(userId);
         salesAccountMapper.insert(account);
+        return account.getId();
     }
 
     @Override
@@ -136,6 +137,19 @@ public class SalesAccountServiceImpl implements SalesAccountService {
                 new LambdaQueryWrapper<SalesAccountUserBinding>()
                         .eq(SalesAccountUserBinding::getSalesAccountId, accountId)
                         .eq(SalesAccountUserBinding::getUserId, userId));
+    }
+
+    @Override
+    public List<SalesAccountRespDTO> listMyAccounts(Long userId) {
+        List<SalesAccountUserBinding> bindings = salesAccountUserBindingMapper.selectList(
+                new LambdaQueryWrapper<SalesAccountUserBinding>()
+                        .eq(SalesAccountUserBinding::getUserId, userId));
+        if (bindings.isEmpty()) return Collections.emptyList();
+        List<Long> accountIds = bindings.stream()
+                .map(SalesAccountUserBinding::getSalesAccountId)
+                .collect(Collectors.toList());
+        List<SalesAccount> accounts = salesAccountMapper.selectBatchIds(accountIds);
+        return convertList(accounts);
     }
 
     private List<SalesAccountRespDTO> convertList(List<SalesAccount> list) {

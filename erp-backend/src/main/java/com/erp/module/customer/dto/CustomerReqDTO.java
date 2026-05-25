@@ -10,9 +10,13 @@ public class CustomerReqDTO {
 
     private String phone;
 
-    private String email;
+    @NotBlank(message = "加粉时间不能为空")
+    private String addFriendTime;
 
-    private String address;
+    private String birthday;
+
+    @NotBlank(message = "微信号不能为空")
+    private String wechatAccount;
 
     private Integer level;
 

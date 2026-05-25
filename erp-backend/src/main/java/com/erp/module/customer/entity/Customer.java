@@ -15,9 +15,11 @@ public class Customer {
 
     private String phone;
 
-    private String email;
+    private LocalDateTime addFriendTime;
 
-    private String address;
+    private String birthday;
+
+    private String wechatAccount;
 
     private Integer level;
 

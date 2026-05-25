@@ -33,8 +33,16 @@ export function cancelOrder(id) {
   return request.post(`/orders/${id}/cancel`)
 }
 
-export function completeOrder(id) {
-  return request.post(`/orders/${id}/complete`)
+export function shipOrder(id) {
+  return request.post(`/orders/${id}/ship`)
+}
+
+export function deliverOrder(id) {
+  return request.post(`/orders/${id}/deliver`)
+}
+
+export function refundOrder(id, data) {
+  return request.post(`/orders/${id}/refund`, data)
 }
 
 export function getAuditLogs(orderId) {
@@ -49,14 +57,22 @@ export function listProductsForOrder() {
   return request.get('/products', { params: { page: 1, pageSize: 999 } })
 }
 
-export function listWechatsForOrder() {
-  return request.get('/sales-wechats/my-wechats')
+export function listAccountsForOrder() {
+  return request.get('/sales-accounts/my-accounts')
 }
 
-export function getBoundCustomers(wechatId) {
-  return request.get(`/sales-bindings/bound-customers?wechatId=${wechatId}`)
+export function getBoundCustomers(accountId) {
+  return request.get(`/sales-bindings/bound-customers?salesAccountId=${accountId}`)
 }
 
 export function exportOrders(mode, params) {
   return downloadBlob('/orders/export', { mode, ...params })
+}
+
+export function importTracking(data) {
+  return request.post('/orders/import-tracking', data)
+}
+
+export function listTracking(orderId) {
+  return request.get(`/orders/${orderId}/tracking`)
 }

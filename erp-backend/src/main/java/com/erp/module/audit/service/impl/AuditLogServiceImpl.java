@@ -94,6 +94,8 @@ public class AuditLogServiceImpl implements AuditLogService {
             case "SUBMIT": return "提交审批";
             case "APPROVE": return "审批通过";
             case "REJECT": return "审批驳回";
+            case "SHIP": return "发货";
+            case "DELIVER": return "确认妥投";
             case "CANCEL": return "取消订单";
             case "COMPLETE": return "完成订单";
             default: return action;

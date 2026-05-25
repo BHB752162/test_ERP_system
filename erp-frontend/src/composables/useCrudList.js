@@ -15,6 +15,7 @@ export function useCrudList(fetchApi, options = {}) {
   const list = ref([])
   const total = ref(0)
   const loading = ref(false)
+  const error = ref('')
   const query = reactive({
     keyword: '',
     page: 1,
@@ -24,6 +25,7 @@ export function useCrudList(fetchApi, options = {}) {
 
   async function fetchData() {
     loading.value = true
+    error.value = ''
     try {
       const res = await fetchApi(query)
       const data = res.data || res
@@ -31,6 +33,7 @@ export function useCrudList(fetchApi, options = {}) {
       total.value = data.total || 0
       onSuccess?.(res)
     } catch (err) {
+      error.value = err?.response?.data?.message || err?.message || '加载失败，请稍后重试'
       onError?.(err)
     } finally {
       loading.value = false
@@ -57,6 +60,7 @@ export function useCrudList(fetchApi, options = {}) {
     list,
     total,
     loading,
+    error,
     query,
     fetchData,
     search,

@@ -70,3 +70,28 @@ export function updateShippingAddress(id, data) {
 export function deleteShippingAddress(id) {
   return request.delete(`/customers/shipping-addresses/${id}`)
 }
+
+// Sales account binding
+export function getBoundAccounts(customerId) {
+  return request.get(`/sales-bindings/bound-accounts?customerId=${customerId}`)
+}
+
+export function createBinding(data) {
+  return request.post('/sales-bindings', data)
+}
+
+export function createSelfBinding(data) {
+  return request.post('/sales-bindings/self-service', data)
+}
+
+export function unbind(id) {
+  return request.delete(`/sales-bindings/${id}`)
+}
+
+export function listSalesAccounts() {
+  return request.get('/sales-accounts', { params: { page: 1, pageSize: 999 } })
+}
+
+export function listMyAccounts() {
+  return request.get('/sales-accounts/my-accounts')
+}

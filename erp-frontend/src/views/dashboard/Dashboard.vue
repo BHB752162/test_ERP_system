@@ -1,7 +1,7 @@
 <template>
   <div v-loading="loading">
     <el-row :gutter="24">
-      <el-col :span="6">
+      <el-col :span="8">
         <el-card shadow="never" class="stat-card">
           <div style="display: flex; align-items: center; gap: 16px">
             <div class="stat-icon" style="background: linear-gradient(135deg, #409eff, #337ecc)">
@@ -14,7 +14,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="8">
         <el-card shadow="never" class="stat-card">
           <div style="display: flex; align-items: center; gap: 16px">
             <div class="stat-icon" style="background: linear-gradient(135deg, #67c23a, #529b2e)">
@@ -27,7 +27,7 @@
           </div>
         </el-card>
       </el-col>
-      <el-col :span="6">
+      <el-col :span="8">
         <el-card shadow="never" class="stat-card">
           <div style="display: flex; align-items: center; gap: 16px">
             <div class="stat-icon" style="background: linear-gradient(135deg, #e6a23c, #cf9236)">
@@ -36,19 +36,6 @@
             <div>
               <div class="stat-label">订单总数</div>
               <div class="stat-value" style="color: #e6a23c">{{ stats.orderCount ?? '--' }}</div>
-            </div>
-          </div>
-        </el-card>
-      </el-col>
-      <el-col :span="6">
-        <el-card shadow="never" class="stat-card">
-          <div style="display: flex; align-items: center; gap: 16px">
-            <div class="stat-icon" style="background: linear-gradient(135deg, #f56c6c, #d9534f)">
-              <el-icon :size="24"><ChatDotRound /></el-icon>
-            </div>
-            <div>
-              <div class="stat-label">微信号数</div>
-              <div class="stat-value" style="color: #f56c6c">{{ stats.wechatCount ?? '--' }}</div>
             </div>
           </div>
         </el-card>
@@ -78,7 +65,7 @@
             </p>
             <p>
               <el-icon style="margin-right: 6px; vertical-align: middle"><Tools /></el-icon>
-              <strong>系统功能：</strong>顾客管理 / 产品管理 / 微信号管理 / 订单管理 / 审批管理
+              <strong>系统功能：</strong>顾客管理 / 产品管理 / 订单管理 / 审批管理
             </p>
           </div>
         </el-card>
@@ -89,8 +76,8 @@
             <span>快捷入口</span>
           </template>
           <div style="display: flex; flex-direction: column; gap: 12px">
-            <el-button type="primary" size="large" style="justify-content: flex-start" @click="$router.push('/orders/create')">
-              <el-icon style="margin-right: 8px"><Edit /></el-icon> 创建订单
+            <el-button type="primary" size="large" style="justify-content: flex-start" @click="$router.push('/orders')">
+              <el-icon style="margin-right: 8px"><Edit /></el-icon> 订单管理
             </el-button>
             <el-button type="success" size="large" style="justify-content: flex-start" @click="$router.push('/customers')">
               <el-icon style="margin-right: 8px"><User /></el-icon> 顾客管理
@@ -110,20 +97,17 @@ import { computed } from 'vue'
 import { ref, reactive, onMounted } from 'vue'
 import { useAuthStore } from '../../store/auth'
 import { getStats } from '../../api/dashboard'
-import { useRouter } from 'vue-router'
 
-const router = useRouter()
 const auth = useAuthStore()
 const loading = ref(false)
 const stats = reactive({
   customerCount: null,
   productCount: null,
-  orderCount: null,
-  wechatCount: null
+  orderCount: null
 })
 
 const roleTagType = computed(() => {
-  const map = { ADMIN: 'danger', SALES_MANAGER: 'warning', SALES_PERSON: 'success' }
+  const map = { ADMIN: 'danger', SALES_PERSON: 'success' }
   return map[auth.userInfo?.roleCode] || 'info'
 })
 

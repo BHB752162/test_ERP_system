@@ -8,9 +8,10 @@
         </el-button>
       </div>
     </template>
+    <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" style="margin-bottom: 16px" />
     <el-table :data="list" border stripe v-loading="loading" row-key="id">
       <template #empty>
-        <el-empty description="暂无数据" />
+        <el-empty :description="error || '暂无数据'" />
       </template>
       <el-table-column prop="id" label="ID" width="60" />
       <el-table-column prop="typeCode" label="编码" width="120" />
@@ -69,6 +70,7 @@ import StatusTag from '../../components/StatusTag.vue'
 
 const list = ref([])
 const loading = ref(false)
+const error = ref('')
 const submitting = ref(false)
 const formRef = ref(null)
 const dialogVisible = ref(false)
@@ -84,9 +86,12 @@ const rules = {
 
 async function fetchData() {
   loading.value = true
+  error.value = ''
   try {
     const res = await listChannelTypes()
     list.value = res.data
+  } catch (err) {
+    error.value = err?.response?.data?.message || err?.message || '加载失败'
   } finally {
     loading.value = false
   }

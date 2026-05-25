@@ -31,7 +31,9 @@ public class CustomerController {
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize,
             @RequestParam(required = false) String keyword) {
-        IPage<Customer> result = customerService.listCustomers(page, pageSize, keyword);
+        Long userId = SecurityUtils.getCurrentUserId();
+        String roleCode = SecurityUtils.getCurrentRoleCode();
+        IPage<Customer> result = customerService.listCustomers(page, pageSize, keyword, userId, roleCode);
         return ApiResponse.success(PageResult.of(result));
     }
 
@@ -41,9 +43,9 @@ public class CustomerController {
     }
 
     @PostMapping
-    public ApiResponse<Void> create(@Valid @RequestBody CustomerReqDTO req) {
-        customerService.create(req, SecurityUtils.getCurrentUserId());
-        return ApiResponse.success();
+    public ApiResponse<Long> create(@Valid @RequestBody CustomerReqDTO req) {
+        Long id = customerService.create(req, SecurityUtils.getCurrentUserId());
+        return ApiResponse.success(id);
     }
 
     @PutMapping("/{id}")

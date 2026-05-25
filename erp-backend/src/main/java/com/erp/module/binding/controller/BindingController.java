@@ -21,26 +21,32 @@ public class BindingController {
 
     @GetMapping
     public ApiResponse<PageResult<BindingRespDTO>> listAll(
-            @RequestParam(required = false) Long wechatId,
+            @RequestParam(required = false) Long salesAccountId,
             @RequestParam(required = false) Long customerId,
             @RequestParam(defaultValue = "1") Integer page,
             @RequestParam(defaultValue = "10") Integer pageSize) {
-        return ApiResponse.success(PageResult.of(bindingService.listAll(wechatId, customerId, page, pageSize)));
+        return ApiResponse.success(PageResult.of(bindingService.listAll(salesAccountId, customerId, page, pageSize)));
     }
 
     @GetMapping("/bound-customers")
-    public ApiResponse<List<BindingRespDTO>> listBoundCustomers(@RequestParam Long wechatId) {
-        return ApiResponse.success(bindingService.listBoundCustomersByWechat(wechatId));
+    public ApiResponse<List<BindingRespDTO>> listBoundCustomers(@RequestParam Long salesAccountId) {
+        return ApiResponse.success(bindingService.listBoundCustomersByAccount(salesAccountId));
     }
 
-    @GetMapping("/bound-wechats")
-    public ApiResponse<List<BindingRespDTO>> listBoundWechats(@RequestParam Long customerId) {
-        return ApiResponse.success(bindingService.listBoundWechatsByCustomer(customerId));
+    @GetMapping("/bound-accounts")
+    public ApiResponse<List<BindingRespDTO>> listBoundAccounts(@RequestParam Long customerId) {
+        return ApiResponse.success(bindingService.listBoundAccountsByCustomer(customerId));
     }
 
     @PostMapping
     public ApiResponse<Void> create(@Valid @RequestBody BindingReqDTO req) {
         bindingService.create(req);
+        return ApiResponse.success();
+    }
+
+    @PostMapping("/self-service")
+    public ApiResponse<Void> createSelfBinding(@Valid @RequestBody BindingReqDTO req) {
+        bindingService.createSelfBinding(req);
         return ApiResponse.success();
     }
 

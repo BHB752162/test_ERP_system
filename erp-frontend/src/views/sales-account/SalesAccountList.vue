@@ -8,9 +8,10 @@
         </el-button>
       </div>
     </template>
+    <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" style="margin-bottom: 16px" />
     <el-table :data="list" border stripe v-loading="loading" row-key="id">
       <template #empty>
-        <el-empty description="暂无数据" />
+        <el-empty :description="error || '暂无数据'" />
       </template>
       <el-table-column prop="id" label="ID" width="60" />
       <el-table-column prop="accountName" label="销售账户" min-width="150" />
@@ -58,7 +59,7 @@
         <el-form-item label="状态">
           <el-switch v-model="formData.status" :active-value="1" :inactive-value="0" />
         </el-form-item>
-        <el-form-item v-if="isEdit" label="绑定用户">
+        <el-form-item label="绑定用户">
           <div style="width: 100%">
             <div style="display: flex; gap: 8px; margin-bottom: 8px">
               <el-select v-model="selectedUserId" placeholder="选择用户" style="flex: 1" clearable filterable>
@@ -104,6 +105,7 @@ import StatusTag from '../../components/StatusTag.vue'
 
 const list = ref([])
 const loading = ref(false)
+const error = ref('')
 const submitting = ref(false)
 const formRef = ref(null)
 const dialogVisible = ref(false)
@@ -141,9 +143,12 @@ function getUserLabel(uid) {
 
 async function fetchData() {
   loading.value = true
+  error.value = ''
   try {
     const res = await listSalesAccounts()
     list.value = res.data
+  } catch (err) {
+    error.value = err?.response?.data?.message || err?.message || '加载失败'
   } finally {
     loading.value = false
   }
@@ -159,11 +164,11 @@ async function showDialog(row) {
   dialogVisible.value = true
 
   // 加载用户列表和绑定数据
+  await loadAllUsers()
   if (isEdit.value) {
-    await Promise.all([
-      loadAllUsers(),
-      loadBoundUsers(row.id)
-    ])
+    await loadBoundUsers(row.id)
+  } else {
+    boundUserIds.value = []
   }
 }
 
@@ -183,20 +188,24 @@ async function loadBoundUsers(accountId) {
 
 async function handleBindUser() {
   if (!selectedUserId.value) return
-  try {
-    await bindUser(editId.value, selectedUserId.value)
-    boundUserIds.value.push(selectedUserId.value)
-    selectedUserId.value = null
-    ElMessage.success('绑定成功')
-  } catch { /* handled by interceptor */ }
+  if (isEdit.value) {
+    try {
+      await bindUser(editId.value, selectedUserId.value)
+    } catch { return }
+  }
+  boundUserIds.value.push(selectedUserId.value)
+  selectedUserId.value = null
+  ElMessage.success('绑定成功')
 }
 
 async function handleUnbindUser(userId) {
-  try {
-    await unbindUser(editId.value, userId)
-    boundUserIds.value = boundUserIds.value.filter(id => id !== userId)
-    ElMessage.success('已解绑')
-  } catch { /* handled by interceptor */ }
+  if (isEdit.value) {
+    try {
+      await unbindUser(editId.value, userId)
+    } catch { return }
+  }
+  boundUserIds.value = boundUserIds.value.filter(id => id !== userId)
+  ElMessage.success('已解绑')
 }
 
 function closeDialog() {
@@ -209,13 +218,23 @@ function closeDialog() {
 async function handleSubmit() {
   const valid = await formRef.value.validate().catch(() => false)
   if (!valid) return
+
+  if (!isEdit.value && boundUserIds.value.length === 0) {
+    ElMessage.warning('请至少绑定一个用户')
+    return
+  }
+
   submitting.value = true
   try {
     if (isEdit.value) {
       await updateSalesAccount(editId.value, formData)
       ElMessage.success('更新成功')
     } else {
-      await createSalesAccount(formData)
+      // 创建后再绑定用户
+      const newId = (await createSalesAccount(formData)).data
+      for (const userId of boundUserIds.value) {
+        await bindUser(newId, userId)
+      }
       ElMessage.success('创建成功')
     }
     closeDialog()

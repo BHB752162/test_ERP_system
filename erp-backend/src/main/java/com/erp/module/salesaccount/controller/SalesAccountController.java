@@ -4,6 +4,7 @@ import com.erp.common.response.ApiResponse;
 import com.erp.module.salesaccount.dto.SalesAccountReqDTO;
 import com.erp.module.salesaccount.dto.SalesAccountRespDTO;
 import com.erp.module.salesaccount.service.SalesAccountService;
+import com.erp.security.SecurityUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -23,15 +24,20 @@ public class SalesAccountController {
         return ApiResponse.success(salesAccountService.listAll(keyword));
     }
 
+    @GetMapping("/my-accounts")
+    public ApiResponse<List<SalesAccountRespDTO>> listMyAccounts() {
+        return ApiResponse.success(salesAccountService.listMyAccounts(SecurityUtils.getCurrentUserId()));
+    }
+
     @GetMapping("/{id}")
     public ApiResponse<SalesAccountRespDTO> getById(@PathVariable Long id) {
         return ApiResponse.success(salesAccountService.getById(id));
     }
 
     @PostMapping
-    public ApiResponse<Void> create(@Valid @RequestBody SalesAccountReqDTO req) {
-        salesAccountService.create(req);
-        return ApiResponse.success();
+    public ApiResponse<Long> create(@Valid @RequestBody SalesAccountReqDTO req) {
+        Long id = salesAccountService.create(req);
+        return ApiResponse.success(id);
     }
 
     @PutMapping("/{id}")

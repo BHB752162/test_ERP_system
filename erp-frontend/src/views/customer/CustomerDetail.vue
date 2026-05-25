@@ -12,15 +12,16 @@
       <el-descriptions :column="2" border>
         <el-descriptions-item label="客户名称" min-width="160">{{ customer.customerName }}</el-descriptions-item>
         <el-descriptions-item label="联系电话">{{ customer.phone }}</el-descriptions-item>
-        <el-descriptions-item label="邮箱">{{ customer.email }}</el-descriptions-item>
         <el-descriptions-item label="等级">
           <StatusTag :status="customer.level" :map="CUSTOMER_LEVEL_MAP" />
         </el-descriptions-item>
         <el-descriptions-item label="状态">
           <StatusTag :status="customer.status" :map="ENABLE_STATUS_MAP" />
         </el-descriptions-item>
-        <el-descriptions-item label="地址">{{ customer.address }}</el-descriptions-item>
-        <el-descriptions-item label="备注" :span="2">{{ customer.remark || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="加粉时间">{{ customer.addFriendTime ? customer.addFriendTime.substring(0, 10) : '-' }}</el-descriptions-item>
+        <el-descriptions-item label="顾客生日">{{ customer.birthday || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="微信号">{{ customer.wechatAccount || '-' }}</el-descriptions-item>
+        <el-descriptions-item label="顾客备注" :span="2">{{ customer.remark || '-' }}</el-descriptions-item>
         <el-descriptions-item label="创建时间">{{ customer.createdAt }}</el-descriptions-item>
         <el-descriptions-item label="更新时间">{{ customer.updatedAt }}</el-descriptions-item>
       </el-descriptions>
@@ -29,41 +30,24 @@
     <el-card shadow="never" style="margin-top: 16px">
       <template #header>
         <div class="flex-between">
-          <span>付款渠道</span>
-          <el-button size="small" type="primary" @click="showChannelDialog(null)">
-            <el-icon style="margin-right: 4px"><Plus /></el-icon> 添加渠道
+          <span>绑定销售账户</span>
+          <el-button size="small" type="primary" @click="showBindDialog">
+            <el-icon style="margin-right: 4px"><Plus /></el-icon> 绑定销售账户
           </el-button>
         </div>
       </template>
-      <el-table :data="channels" border stripe size="small" v-loading="channelLoading">
+      <el-table :data="boundAccounts" border stripe size="small" v-loading="bindingLoading">
         <template #empty>
-          <el-empty description="暂无付款渠道" />
+          <el-empty description="暂未绑定销售账户" />
         </template>
-        <el-table-column prop="channelType" label="类型" width="100">
+        <el-table-column prop="salesAccountName" label="账户名称" min-width="140" />
+        <el-table-column prop="salesAccountDisplayName" label="显示名称" width="140" />
+        <el-table-column prop="createdAt" label="绑定时间" width="160" />
+        <el-table-column label="操作" width="100" fixed="right">
           <template #default="{ row }">
-            <StatusTag :status="row.channelType" :map="CHANNEL_TYPE_MAP" />
-          </template>
-        </el-table-column>
-        <el-table-column prop="channelAccount" label="账号" min-width="140" />
-        <el-table-column prop="accountName" label="户名" width="100" />
-        <el-table-column prop="bankName" label="开户行" width="160" />
-        <el-table-column prop="isDefault" label="默认" width="70" align="center">
-          <template #default="{ row }">
-            <el-tag v-if="row.isDefault" type="success" size="small">是</el-tag>
-            <span v-else style="color: #c0c4cc">否</span>
-          </template>
-        </el-table-column>
-        <el-table-column prop="status" label="状态" width="70">
-          <template #default="{ row }">
-            <StatusTag :status="row.status" :map="ENABLE_STATUS_MAP" />
-          </template>
-        </el-table-column>
-        <el-table-column label="操作" width="150" fixed="right">
-          <template #default="{ row }">
-            <el-button type="primary" link @click="showChannelDialog(row)">编辑</el-button>
-            <el-popconfirm title="确认删除此付款渠道？" @confirm="deleteChannel(row.id)">
+            <el-popconfirm title="确认解绑？" @confirm="handleUnbind(row.id)">
               <template #reference>
-                <el-button type="danger" link>删除</el-button>
+                <el-button type="danger" link>解绑</el-button>
               </template>
             </el-popconfirm>
           </template>
@@ -74,31 +58,29 @@
     <el-card shadow="never" style="margin-top: 16px">
       <template #header>
         <div class="flex-between">
-          <span>联系人</span>
-          <el-button size="small" type="primary" @click="showContactDialog(null)">
-            <el-icon style="margin-right: 4px"><Plus /></el-icon> 添加联系人
+          <span>客户地址</span>
+          <el-button size="small" type="primary" @click="showAddressDialog(null)">
+            <el-icon style="margin-right: 4px"><Plus /></el-icon> 添加地址
           </el-button>
         </div>
       </template>
-      <el-table :data="contacts" border stripe size="small" v-loading="contactLoading">
+      <el-table :data="addresses" border stripe size="small" v-loading="addressLoading">
         <template #empty>
-          <el-empty description="暂无联系人" />
+          <el-empty description="暂无地址" />
         </template>
-        <el-table-column prop="contactName" label="姓名" width="100" />
-        <el-table-column prop="phone" label="电话" width="130" />
-        <el-table-column prop="email" label="邮箱" width="160" />
-        <el-table-column prop="position" label="职位" width="120" />
-        <el-table-column prop="isPrimary" label="主要" width="70" align="center">
+        <el-table-column prop="recipientName" label="收件人姓名" width="120" />
+        <el-table-column prop="recipientPhone" label="收件人电话" width="140" />
+        <el-table-column prop="address" label="收件地址" min-width="200" />
+        <el-table-column prop="isDefault" label="默认" width="70" align="center">
           <template #default="{ row }">
-            <el-tag v-if="row.isPrimary" type="success" size="small">是</el-tag>
+            <el-tag v-if="row.isDefault" type="success" size="small">是</el-tag>
             <span v-else style="color: #c0c4cc">否</span>
           </template>
         </el-table-column>
-        <el-table-column prop="remark" label="备注" min-width="150" />
         <el-table-column label="操作" width="150" fixed="right">
           <template #default="{ row }">
-            <el-button type="primary" link @click="showContactDialog(row)">编辑</el-button>
-            <el-popconfirm title="确认删除此联系人？" @confirm="deleteContact(row.id)">
+            <el-button type="primary" link @click="showAddressDialog(row)">编辑</el-button>
+            <el-popconfirm title="确认删除此地址？" @confirm="deleteAddress(row.id)">
               <template #reference>
                 <el-button type="danger" link>删除</el-button>
               </template>
@@ -108,185 +90,169 @@
       </el-table>
     </el-card>
 
-    <!-- Channel Dialog -->
-    <el-dialog v-model="channelDialog.visible" :title="channelDialog.isEdit ? '编辑渠道' : '添加渠道'" width="500px" destroy-on-close>
-      <el-form ref="channelFormRef" :model="channelForm" :rules="channelRules" label-width="100px">
-        <el-form-item label="渠道类型" prop="channelType">
-          <el-select v-model="channelForm.channelType" style="width: 100%" placeholder="请选择渠道类型">
-            <el-option label="支付宝" value="ALIPAY" />
-            <el-option label="微信" value="WECHAT" />
-            <el-option label="银行卡" value="BANK_CARD" />
-            <el-option label="现金" value="CASH" />
-            <el-option label="其他" value="OTHER" />
+    <!-- Bind Account Dialog -->
+    <el-dialog v-model="bindDialog.visible" title="绑定销售账户" width="500px" destroy-on-close>
+      <el-form ref="bindFormRef" :model="bindForm" :rules="bindRules" label-width="100px">
+        <el-form-item label="销售账户" prop="salesAccountId">
+          <el-select v-model="bindForm.salesAccountId" placeholder="请选择销售账户" style="width: 100%" filterable>
+            <el-option
+              v-for="a in availableAccounts"
+              :key="a.id"
+              :value="a.id"
+              :label="`${a.displayName || a.accountName}`"
+            />
           </el-select>
-        </el-form-item>
-        <el-form-item label="账号" prop="channelAccount">
-          <el-input v-model="channelForm.channelAccount" placeholder="请输入账号" />
-        </el-form-item>
-        <el-form-item label="户名" prop="accountName">
-          <el-input v-model="channelForm.accountName" placeholder="请输入户名" />
-        </el-form-item>
-        <el-form-item label="开户行" prop="bankName">
-          <el-input v-model="channelForm.bankName" placeholder="请输入开户行" />
-        </el-form-item>
-        <el-form-item label="是否默认">
-          <el-switch v-model="channelForm.isDefault" :active-value="1" :inactive-value="0" />
-        </el-form-item>
-        <el-form-item label="状态">
-          <el-switch v-model="channelForm.status" :active-value="1" :inactive-value="0" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="channelDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="channelSubmitting" @click="submitChannel">保存</el-button>
+        <el-button @click="bindDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="bindSubmitting" @click="submitBind">保存</el-button>
       </template>
     </el-dialog>
 
-    <!-- Contact Dialog -->
-    <el-dialog v-model="contactDialog.visible" :title="contactDialog.isEdit ? '编辑联系人' : '添加联系人'" width="500px" destroy-on-close>
-      <el-form ref="contactFormRef" :model="contactForm" :rules="contactRules" label-width="100px">
-        <el-form-item label="姓名" prop="contactName">
-          <el-input v-model="contactForm.contactName" placeholder="请输入姓名" />
+    <!-- Address Dialog -->
+    <el-dialog v-model="addressDialog.visible" :title="addressDialog.isEdit ? '编辑地址' : '添加地址'" width="500px" destroy-on-close>
+      <el-form ref="addressFormRef" :model="addressForm" :rules="addressRules" label-width="110px">
+        <el-form-item label="收件人姓名" prop="recipientName">
+          <el-input v-model="addressForm.recipientName" placeholder="请输入收件人姓名" />
         </el-form-item>
-        <el-form-item label="电话" prop="phone">
-          <el-input v-model="contactForm.phone" placeholder="请输入电话" />
+        <el-form-item label="收件人电话" prop="recipientPhone">
+          <el-input v-model="addressForm.recipientPhone" placeholder="请输入收件人电话" />
         </el-form-item>
-        <el-form-item label="邮箱" prop="email">
-          <el-input v-model="contactForm.email" placeholder="请输入邮箱" />
+        <el-form-item label="收件地址" prop="address">
+          <el-input v-model="addressForm.address" type="textarea" :rows="3" placeholder="请输入收件地址" />
         </el-form-item>
-        <el-form-item label="职位" prop="position">
-          <el-input v-model="contactForm.position" placeholder="请输入职位" />
-        </el-form-item>
-        <el-form-item label="主要联系人">
-          <el-switch v-model="contactForm.isPrimary" :active-value="1" :inactive-value="0" />
-        </el-form-item>
-        <el-form-item label="备注" prop="remark">
-          <el-input v-model="contactForm.remark" type="textarea" :rows="2" placeholder="备注信息" />
+        <el-form-item label="默认地址">
+          <el-switch v-model="addressForm.isDefault" :active-value="1" :inactive-value="0" />
         </el-form-item>
       </el-form>
       <template #footer>
-        <el-button @click="contactDialog.visible = false">取消</el-button>
-        <el-button type="primary" :loading="contactSubmitting" @click="submitContact">保存</el-button>
+        <el-button @click="addressDialog.visible = false">取消</el-button>
+        <el-button type="primary" :loading="addressSubmitting" @click="submitAddress">保存</el-button>
       </template>
     </el-dialog>
   </div>
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
-import { getCustomer, listChannels, createChannel, updateChannel, deleteChannel as delChannel, listContacts, createContact, updateContact, deleteContact as delContact } from '../../api/customer'
-import { CUSTOMER_LEVEL_MAP, ENABLE_STATUS_MAP, CHANNEL_TYPE_MAP } from '../../constants'
+import { getCustomer, listShippingAddresses, createShippingAddress, updateShippingAddress, deleteShippingAddress as delShippingAddress, getBoundAccounts, createBinding, createSelfBinding, unbind, listSalesAccounts, listMyAccounts } from '../../api/customer'
+import { CUSTOMER_LEVEL_MAP, ENABLE_STATUS_MAP } from '../../constants'
+import { useAuthStore } from '../../store/auth'
 import StatusTag from '../../components/StatusTag.vue'
 
 const route = useRoute()
 const router = useRouter()
+const auth = useAuthStore()
 
 const customer = ref({})
-const channels = ref([])
-const contacts = ref([])
-const channelLoading = ref(false)
-const contactLoading = ref(false)
+const boundAccounts = ref([])
+const addresses = ref([])
+const bindingLoading = ref(false)
+const addressLoading = ref(false)
 
 const customerId = route.params.id
 
-// Channel
-const channelDialog = reactive({ visible: false, isEdit: false, editId: null })
-const channelForm = reactive({ channelType: '', channelAccount: '', accountName: '', bankName: '', isDefault: 0, status: 1 })
-const channelRules = {
-  channelType: [{ required: true, message: '请选择类型', trigger: 'change' }],
-  channelAccount: [{ required: true, message: '请输入账号', trigger: 'blur' }]
-}
-const channelSubmitting = ref(false)
-const channelFormRef = ref(null)
+// Bind Account
+const bindDialog = reactive({ visible: false })
+const bindForm = reactive({ salesAccountId: null })
+const bindRules = { salesAccountId: [{ required: true, message: '请选择销售账户', trigger: 'change' }] }
+const bindSubmitting = ref(false)
+const bindFormRef = ref(null)
+const availableAccounts = ref([])
 
-// Contact
-const contactDialog = reactive({ visible: false, isEdit: false, editId: null })
-const contactForm = reactive({ contactName: '', phone: '', email: '', position: '', isPrimary: 0, remark: '' })
-const contactRules = { contactName: [{ required: true, message: '请输入姓名', trigger: 'blur' }] }
-const contactSubmitting = ref(false)
-const contactFormRef = ref(null)
+// Address
+const addressDialog = reactive({ visible: false, isEdit: false, editId: null })
+const addressForm = reactive({ recipientName: '', recipientPhone: '', address: '', isDefault: 0 })
+const addressRules = {
+  recipientName: [{ required: true, message: '请输入收件人姓名', trigger: 'blur' }],
+  recipientPhone: [{ required: true, message: '请输入收件人电话', trigger: 'blur' }],
+  address: [{ required: true, message: '请输入收件地址', trigger: 'blur' }]
+}
+const addressSubmitting = ref(false)
+const addressFormRef = ref(null)
 
 async function fetchData() {
-  const [cRes, chRes, coRes] = await Promise.all([
-    getCustomer(customerId), listChannels(customerId), listContacts(customerId)
+  const [cRes, bRes, aRes] = await Promise.all([
+    getCustomer(customerId), getBoundAccounts(customerId), listShippingAddresses(customerId)
   ])
   customer.value = cRes.data
-  channels.value = chRes.data
-  contacts.value = coRes.data
+  boundAccounts.value = bRes.data || []
+  addresses.value = aRes.data
 }
 
-function showChannelDialog(row) {
-  channelDialog.isEdit = !!row
-  channelDialog.editId = row?.id || null
-  Object.assign(channelForm, row ? { ...row } : { channelType: '', channelAccount: '', accountName: '', bankName: '', isDefault: 0, status: 1 })
-  channelDialog.visible = true
-}
-
-async function submitChannel() {
-  const valid = await channelFormRef.value.validate().catch(() => false)
-  if (!valid) return
-  channelSubmitting.value = true
+async function showBindDialog() {
+  bindForm.salesAccountId = null
   try {
-    if (channelDialog.isEdit) {
-      await updateChannel(customerId, channelDialog.editId, channelForm)
-      ElMessage.success('更新成功')
-    } else {
-      await createChannel(customerId, channelForm)
-      ElMessage.success('添加成功')
-    }
-    channelDialog.visible = false
-    channelLoading.value = true
-    channels.value = (await listChannels(customerId)).data
-    channelLoading.value = false
+    const res = auth.hasRole('ADMIN')
+      ? await listSalesAccounts()
+      : await listMyAccounts()
+    availableAccounts.value = (res.data || []).filter(a => a.status !== 0)
+  } catch { /* ignore */ }
+  bindDialog.visible = true
+}
+
+async function submitBind() {
+  const valid = await bindFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  bindSubmitting.value = true
+  try {
+    await createSelfBinding({ salesAccountId: bindForm.salesAccountId, customerId })
+    ElMessage.success('绑定成功')
+    bindDialog.visible = false
+    bindingLoading.value = true
+    boundAccounts.value = (await getBoundAccounts(customerId)).data || []
+    bindingLoading.value = false
   } finally {
-    channelSubmitting.value = false
+    bindSubmitting.value = false
   }
 }
 
-async function deleteChannel(id) {
-  await delChannel(customerId, id)
-  ElMessage.success('删除成功')
-  channelLoading.value = true
-  channels.value = (await listChannels(customerId)).data
-  channelLoading.value = false
-}
-
-function showContactDialog(row) {
-  contactDialog.isEdit = !!row
-  contactDialog.editId = row?.id || null
-  Object.assign(contactForm, row ? { ...row } : { contactName: '', phone: '', email: '', position: '', isPrimary: 0, remark: '' })
-  contactDialog.visible = true
-}
-
-async function submitContact() {
-  const valid = await contactFormRef.value.validate().catch(() => false)
-  if (!valid) return
-  contactSubmitting.value = true
+async function handleUnbind(id) {
   try {
-    if (contactDialog.isEdit) {
-      await updateContact(customerId, contactDialog.editId, contactForm)
+    await unbind(id)
+    ElMessage.success('已解绑')
+    boundAccounts.value = boundAccounts.value.filter(b => b.id !== id)
+  } catch { /* handled by interceptor */ }
+}
+
+function showAddressDialog(row) {
+  addressDialog.isEdit = !!row
+  addressDialog.editId = row?.id || null
+  Object.assign(addressForm, row ? { ...row } : { recipientName: '', recipientPhone: '', address: '', isDefault: 0 })
+  addressDialog.visible = true
+}
+
+async function submitAddress() {
+  const valid = await addressFormRef.value.validate().catch(() => false)
+  if (!valid) return
+  addressSubmitting.value = true
+  try {
+    const data = { ...addressForm, customerId }
+    if (addressDialog.isEdit) {
+      await updateShippingAddress(addressDialog.editId, data)
       ElMessage.success('更新成功')
     } else {
-      await createContact(customerId, contactForm)
+      await createShippingAddress(customerId, data)
       ElMessage.success('添加成功')
     }
-    contactDialog.visible = false
-    contactLoading.value = true
-    contacts.value = (await listContacts(customerId)).data
-    contactLoading.value = false
+    addressDialog.visible = false
+    addressLoading.value = true
+    addresses.value = (await listShippingAddresses(customerId)).data
+    addressLoading.value = false
   } finally {
-    contactSubmitting.value = false
+    addressSubmitting.value = false
   }
 }
 
-async function deleteContact(id) {
-  await delContact(customerId, id)
+async function deleteAddress(id) {
+  await delShippingAddress(id)
   ElMessage.success('删除成功')
-  contactLoading.value = true
-  contacts.value = (await listContacts(customerId)).data
-  contactLoading.value = false
+  addressLoading.value = true
+  addresses.value = (await listShippingAddresses(customerId)).data
+  addressLoading.value = false
 }
 
 onMounted(fetchData)

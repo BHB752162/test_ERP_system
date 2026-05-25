@@ -93,7 +93,7 @@ const avatarText = computed(() => {
 })
 
 const roleTagType = computed(() => {
-  const map = { ADMIN: 'danger', SALES_MANAGER: 'warning', SALES_PERSON: 'success' }
+  const map = { ADMIN: 'danger', SALES_PERSON: 'success' }
   return map[userInfo.value?.roleCode] || 'info'
 })
 

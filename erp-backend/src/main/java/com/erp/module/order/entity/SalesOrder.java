@@ -5,6 +5,7 @@ import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @TableName("sales_order")
@@ -18,7 +19,7 @@ public class SalesOrder {
 
     private Long salesPersonId;
 
-    private Long salesWechatId;
+    private Long salesAccountId;
 
     private BigDecimal totalAmount;
 
@@ -53,4 +54,28 @@ public class SalesOrder {
     private LocalDateTime approvedAt;
 
     private Long updatedBy;
+
+    @TableField(exist = false)
+    private String customerName;
+
+    @TableField(exist = false)
+    private String salesPersonName;
+
+    @TableField(exist = false)
+    private String salesAccountName;
+
+    @TableField(exist = false)
+    private String salesAccountDisplayName;
+
+    @TableField(exist = false)
+    private String statusDisplay;
+
+    @TableField(exist = false)
+    private String paymentChannelTypeName;
+
+    @TableField(exist = false)
+    private BigDecimal paymentAmountDisplay;
+
+    @TableField(exist = false)
+    private List<OrderTracking> trackings;
 }

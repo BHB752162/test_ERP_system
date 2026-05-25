@@ -22,6 +22,7 @@ request.interceptors.response.use(
       ElMessage.error(res.message || '请求失败')
       if (res.code === 401) {
         localStorage.removeItem('token')
+        localStorage.removeItem('erp_auth')
         router.push('/login')
       }
       return Promise.reject(new Error(res.message))
@@ -31,6 +32,7 @@ request.interceptors.response.use(
   error => {
     if (error.response?.status === 401) {
       localStorage.removeItem('token')
+      localStorage.removeItem('erp_auth')
       router.push('/login')
     }
     ElMessage.error(error.response?.data?.message || '网络错误')
