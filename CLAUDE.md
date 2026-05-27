@@ -8,14 +8,17 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **后端**: Spring Boot 2.7.18 + MyBatis-Plus 3.5.3.1 + Spring Security + JWT (jjwt 0.11.5), JDK 17
 - **前端**: Vue 3.4 + Vite 5 + Element Plus 2.5 + Pinia 2.1 + Vue Router 4.3 + Axios 1.6
-- **数据库**: MySQL 8.0+, 17 张 InnoDB 表, utf8mb4
+- **数据库**: MySQL 8.0+, 19 张 InnoDB 表, utf8mb4
 - **项目路径**: `E:\project\test_ERP_system\`
 
 ## Run Commands
 
 ```bash
-# === 启动 MySQL (Windows 服务) ===
+# === 启动 MySQL ===
+# 方式一: Windows 服务（可能不稳定，自动停止）
 sc start MySQL84
+# 方式二: 直接启动（推荐，如果服务异常）
+"C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqld.exe" --console
 
 # === 后端 (port 8080) ===
 export JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot"
@@ -47,8 +50,9 @@ cd E:/project/test_ERP_system/erp-frontend && npm run dev
 | `customer` | customer, customer_payment_channel, customer_contact, customer_shipping_address, payment_channel_type | 顾客信息 + 付款渠道 + 联系人 + 收件地址 + 渠道类型管理(含审计字段) |
 | `product` | product | 产品管理（分类已移除） |
 | `binding` | customer_sales_account_binding | 销售账户↔顾客多对多绑定 |
-| `order` | sales_order, sales_order_item, sales_order_payment, order_tracking, order_tracking_item | 下单 + 审批工作流 + 收款记录 + 运单号导入/查询 |
-| `audit` | order_audit_log | 审批日志查询 |
+| `order` | sales_order, sales_order_item, sales_order_payment, order_tracking, order_tracking_item | 下单 + 审批工作流 + 收款记录 + 运单号导入/查询 + 多条件筛选 |
+| `audit` | order_audit_log, customer_audit_log | 审批日志查询 + 顾客审计日志 |
+| `paymentdashboard` | — | 支付看板: 按收款/审批时间汇总各渠道金额 + Excel导出 |
 
 **模块路径端点:**
 
@@ -59,6 +63,7 @@ cd E:/project/test_ERP_system/erp-frontend && npm run dev
 | 收件地址 | `/api/customers/{cid}/shipping-addresses` | CRUD, 默认地址互斥 |
 | 渠道类型 | `/api/payment-channel-types` | 独立CRUD, POST/PUT/DELETE仅 ADMIN |
 | 销售账户 | `/api/sales-accounts` | 独立CRUD, 仅 ADMIN; 编辑时可绑定/解绑用户 |
+| 支付看板 | `/api/payment-dashboard` | summary / by-approval-time / export-by-approval-time, 仅 ADMIN |
 
 ### Security Rules (SecurityConfig.java + @PreAuthorize)
 
@@ -72,6 +77,7 @@ POST /api/auth/verify-password  → authenticated (验证原密码)
 /api/sales-bindings/**          → hasRole('ADMIN')
 /api/orders/*/approve|reject|ship|deliver|refund → hasRole('ADMIN')
 /api/orders/import-tracking → hasRole('ADMIN')
+/api/orders/tracking/** → hasRole('ADMIN')
 /api/sales-accounts/**          → hasRole('ADMIN')
 POST/PUT/DELETE /api/payment-channel-types → @PreAuthorize("hasRole('ADMIN')")
 所有其他 /api/**                → authenticated
@@ -93,14 +99,23 @@ APPROVED / SHIPPED / DELIVERED → (退款) → REFUNDED
 - 订单号生成: `B`+yyMMdd+6位顺序号 (每日重置, 独立于订单ID)
 - 操作记录: 每次状态变更写入 order_audit_log
 - 发货方式: (1) 手动点击"发货"按钮 → SHIPPED; (2) **运单号导入** → 自动将 APPROVED 订单变更为 SHIPPED
+- **妥投金额驱动状态**: 运单号妥投金额总数 vs 收款金额决定订单状态:
+  - `totalDelivery == totalPayment` → DELIVERED (自动确认妥投)
+  - `totalDelivery < totalPayment` → SHIPPED (保持已发货)
+  - `totalDelivery > totalPayment` → 阻止操作并报错（导入/编辑时校验）
+  - 删除运单号后重新计算，无可发货记录则回退到 APPROVED
+  - 手动点击"确认妥投"时也校验金额一致性，不一致则拒绝
 - 订单保存字段: submittedAt(提交审批时间), approvedAt(审批通过时间), updatedBy(最后更新人), tag(标签: 空=无/DELAYED=延迟发货/WASH_CARE=洗护订单), mallOrderInfo(关联商场订单号)
-- 收件地址快照: 创建订单时从 customer_shipping_address 快照到 sales_order(recipient_name/phone/address)
-- 订单编辑: SAVED/REJECTED 状态可编辑（弹窗复用 OrderCreateDialog），已提交审批后不可编辑
+- 收件地址快照: 创建/编辑订单时从 customer_shipping_address 快照到 sales_order(recipient_name/phone/address)，收件地址为必填项
+- 订单编辑: SAVED/REJECTED 状态可编辑（弹窗复用 OrderCreateDialog），编辑时校验妥投金额≤收款金额，已提交审批后不可编辑
 
 ### Order Controller Endpoints
 
 ```
-GET    /api/orders              → 订单列表 (分页 + 筛选, 含运单信息)
+GET    /api/orders              → 订单列表 (分页 + 多条件筛选, 含运单信息)
+                                  Query: OrderQueryDTO (orderNo, customerName, wechatAccount,
+                                  recipientPhone, recipientName, salesPersonName, tag, status,
+                                  salesAccountId, createdStart/End, submittedStart/End, customerId)
 GET    /api/orders/{id}         → 订单详情
 POST   /api/orders              → 创建订单 (保存草稿)
 PUT    /api/orders/{id}         → 更新订单 (仅 SAVED/REJECTED)
@@ -109,11 +124,41 @@ POST   /api/orders/{id}/approve → 审批通过
 POST   /api/orders/{id}/reject  → 驳回 (JSON body: {comment})
 POST   /api/orders/{id}/cancel  → 取消 (仅 SAVED/REJECTED)
 POST   /api/orders/{id}/ship    → 发货 (手动)
-POST   /api/orders/{id}/deliver → 确认妥投
+POST   /api/orders/{id}/deliver → 确认妥投 (校验妥投金额=收款金额)
 POST   /api/orders/{id}/refund  → 退款
-GET    /api/orders/export       → 导出Excel (mode=order|product)
+GET    /api/orders/export       → 导出Excel (mode=order|product, 复用 OrderQueryDTO 筛选)
 POST   /api/orders/import-tracking  → 运单号导入 (ADMIN, JSON数组)
 GET    /api/orders/{id}/tracking     → 查询订单运单号列表
+DELETE /api/orders/tracking/{trackingId} → 删除运单号 (ADMIN, 重算状态)
+```
+
+### Order Query (OrderQueryDTO)
+
+订单列表和导出均使用 `OrderQueryDTO` 统一参数绑定，支持以下筛选字段:
+
+| 字段 | 类型 | 匹配方式 |
+|------|------|---------|
+| `orderNo` | String | 模糊 (sales_order.order_no) |
+| `customerName` | String | 跨表模糊 → customer.customer_name → customerId IN |
+| `wechatAccount` | String | 跨表模糊 → customer.wechat_account → customerId IN |
+| `salesPersonName` | String | 跨表模糊 → sys_user.real_name → salesPersonId IN |
+| `recipientName` | String | 模糊 (sales_order.recipient_name) |
+| `recipientPhone` | String | 模糊 (sales_order.recipient_phone) |
+| `tag` | String | 精确 (DELAYED / WASH_CARE) |
+| `status` | String | 精确 (状态枚举值) |
+| `salesAccountId` | Long | 精确 |
+| `customerId` | Long | 精确 (从顾客页路由过来) |
+| `createdStart/End` | LocalDate | 日期范围 |
+| `submittedStart/End` | LocalDate | 日期范围 |
+
+所有条件 AND 叠加，通过 `buildOrderQueryWrapper()` 统一构建。
+
+### Payment Dashboard Endpoints
+
+```
+GET /api/payment-dashboard/summary                   → 今日/7天/30天各渠道收款汇总
+GET /api/payment-dashboard/by-approval-time          → 按审批时间范围统计 (startDate, endDate)
+GET /api/payment-dashboard/export-by-approval-time   → 导出收款明细Excel (订单号/状态/提交时间/销售账号/支付渠道/金额)
 ```
 
 ### Frontend Structure (`src/`)
@@ -122,7 +167,7 @@ GET    /api/orders/{id}/tracking     → 查询订单运单号列表
 - **`router/`** — 路由懒加载 + 导航守卫 (未登录→/login; 角色不够→/dashboard)
 - **`store/`** — Pinia auth store (token 持久化到 localStorage, key `erp_auth`)
 - **`layout/`** — AppLayout (Sidebar + Navbar + router-view)
-- **`views/`** — 每个功能一个文件夹; 含 `profile/` (个人信息), `channel-type/` (渠道类型管理), `sales-account/` (销售账户管理), `admin-tools/` (管理员工具: 运单号导入), `order/OrderCreateDialog.vue` (创建/编辑订单弹窗)
+- **`views/`** — 每个功能一个文件夹; 含 `profile/` (个人信息), `channel-type/` (渠道类型管理), `sales-account/` (销售账户管理), `admin-tools/` (管理员工具: 运单号导入), `order/OrderCreateDialog.vue` (创建/编辑订单弹窗), `order/TrackingDetail.vue` (运单详情), `payment-dashboard/PaymentDashboard.vue` (支付看板, 仅ADMIN)
 - **`components/`** — Pagination, StatusTag 全局组件
 - **`composables/`** — `useCrudList` (通用列表加载体/分页/搜索/重置)
 
@@ -131,15 +176,20 @@ GET    /api/orders/{id}/tracking     → 查询订单运单号列表
 - `request.js` 拦截器: 请求加 `Authorization: Bearer` header; 响应处理统一错误弹窗, 401 时清除 `token` 和 `erp_auth` (Pinia持久化key) 后跳转登录
 - `download.js`: 使用 `fetch` + `Authorization` header 绕过 Axios JSON 拦截器, 直接处理 blob 下载
 - `router/index.js` navigation guard: 检查 token, 按需调用 `fetchUserInfo()` 恢复用户状态, 校验 `meta.roles`
-- `Sidebar.vue` 菜单顺序: 仪表盘 → 订单管理(仅订单列表) → 顾客管理 → 产品管理(ADMIN) → 系统管理(销售账户+渠道类型+用户管理) → 审批管理 → 管理员工具(ADMIN: 运单号导入)
+- `Sidebar.vue` 菜单顺序: 仪表盘 → 订单管理(仅订单列表) → 顾客管理 → 产品管理(ADMIN) → 系统管理(销售账户+渠道类型+用户管理+支付看板) → 审批管理 → 管理员工具(ADMIN: 运单号导入)
 - `Navbar.vue` 头像下拉: "个人信息"跳转 /profile
-- 创建订单: **弹窗形式** (`OrderCreateDialog.vue`), 在订单列表页打开, 不作为独立路由页面
+- 创建订单: **弹窗形式** (`OrderCreateDialog.vue`), 在订单列表页打开, 不作为独立路由页面; 含「新增顾客」按钮, 通过 `window.open` + `postMessage` 跨标签页通信, 新建顾客后自动回选
+- 顾客创建页: `from=order` 参数控制返回按钮用 `window.close()` 而非 `router.back()`(新标签页无历史记录), 创建成功后通过 `postMessage` 回传顾客ID/名称给父窗口
 - 用户管理页: 工号代替用户名, 含创建人/更新人/更新时间审计列, 操作列含编辑/重置密码/删除
 - 仪表盘: 统计数据过滤逻辑删除(status=0)的记录
 
 ### Audit Pattern
 
 多数表包含审计字段: `created_by` (BIGINT), `updated_by` (BIGINT), `created_at`, `updated_at`。在后端 Service 中通过 `SecurityUtils.getCurrentUserId()` 手动设置，配合批量查询 (`sysUserMapper.selectBatchIds`) 加载 `createdByName`/`updatedByName` 用于前端展示。DTO 中通过 `@TableField(exist = false)` 标记瞬态姓名字段。
+
+- **customer_audit_log**: 记录顾客信息变更 (customer_id, field_name, old_value, new_value, action, operator_id, operated_at)。用于微信号修改频率控制等审计场景。
+- **order_audit_log**: 记录订单状态变更 (order_id, action, operator_id, comment, operated_at)。
+- **微信号修改限制**: 非 ADMIN 用户每年仅可修改一次顾客微信号。通过查询 `customer_audit_log` 中 field_name='微信号' 的最近一次 UPDATE 记录判断，365天内有过修改则拒绝。管理员不受限。
 
 ### Batch Loading Pattern (避免 N+1)
 
@@ -183,7 +233,10 @@ customer ─1:N→ customer_shipping_address
 - **前端页面**: `admin-tools/TrackingImport.vue`, Excel 拖拽上传 → `xlsx` 库解析 → 预览表格 → 确认导入
 - **Excel 列顺序**: 订单号 | 运单号 | 发货类型 | 发货时间 | 产品SKU | 数量 | 妥投金额
 - **必填校验**: 订单号、运单号、产品SKU、数量为必填; 发货类型填"洗护"或不填; 妥投金额不填默认0; 发货时间不填默认系统时间
-- **后端逻辑**: 按 (orderNo, trackingNo) 分组 → 校验订单状态(APPROVED/SHIPPED/DELIVERED) → 插主表+子表 → APPROVED 自动变更为 SHIPPED → 写审计日志
+- **后端逻辑 (两阶段)**:
+  1. 按 (orderNo, trackingNo) 分组 → 校验订单状态(APPROVED/SHIPPED/DELIVERED) → 校验所有SKU存在 → 计算已有+新增妥投总额 vs 收款金额(超过则报错)
+  2. 插主表+子表 → 根据金额对比自动更新状态(见妥投金额驱动状态规则) → 写审计日志
+- **运单号删除**: ADMIN 可删除, 删除后重算剩余妥投金额 vs 收款, 自动调整订单状态(无记录则回退APPROVED)
 - **订单列表展示**: 订单列表 API 含运单信息, 前端展示运单号标签(洗护橙色/普通灰色) + 发货时间 + 妥投金额 + 产品名称×数量明细
 - **产品名称匹配**: 运单 SKU 明细通过 `product_code` 回查 `product` 表获取产品名称, 未匹配则回退显示 SKU 编码
 
