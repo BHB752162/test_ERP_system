@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-电商ERP系统 — 订单管理 + 顾客管理 + 产品管理。
+时黛王妃业务系统 — 订单管理 + 顾客管理 + 产品管理。
 
 - **后端**: Spring Boot 2.7.18 + MyBatis-Plus 3.5.3.1 + Spring Security + JWT (jjwt 0.11.5), JDK 17
 - **前端**: Vue 3.4 + Vite 5 + Element Plus 2.5 + Pinia 2.1 + Vue Router 4.3 + Axios 1.6
@@ -13,12 +13,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Run Commands
 
+### 开发模式 (单人开发/调试)
+
 ```bash
 # === 启动 MySQL ===
-# 方式一: Windows 服务（可能不稳定，自动停止）
 sc start MySQL84
-# 方式二: 直接启动（推荐，如果服务异常）
-"C:\Program Files\MySQL\MySQL Server 8.4\bin\mysqld.exe" --console
 
 # === 后端 (port 8080) ===
 export JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot"
@@ -26,11 +25,83 @@ export MAVEN_HOME="/c/Program Files/Maven/apache-maven-3.9.15"
 export PATH="$JAVA_HOME/bin:$MAVEN_HOME/bin:$PATH"
 cd E:/project/test_ERP_system/erp-backend && mvn spring-boot:run
 
-# === 前端 (port 3000, 代理 /api -> :8080) ===
+# === 前端 (port 3000, Vite HMR) ===
 cd E:/project/test_ERP_system/erp-frontend && npm run dev
 ```
 
+### 生产模式 (50 人并发, 推荐日常使用)
+
+```bash
+# === 1. 启动 MySQL ===
+sc start MySQL84
+
+# === 2. 后端 jar 包 (port 8080) ===
+# 首次或配置变更后需重新打包: mvn package -DskipTests
+export JAVA_HOME="/c/Program Files/Eclipse Adoptium/jdk-17.0.19.10-hotspot"
+java -Xms256m -Xmx512m -jar E:/project/test_ERP_system/erp-backend/target/erp-system.jar
+
+# === 3. 前端构建 ===
+cd E:/project/test_ERP_system/erp-frontend && npm run build
+
+# === 4. 启动 Nginx (port 80) ===
+# 下载 nginx Windows 版: https://nginx.org/en/download.html (推荐 Stable 版)
+# 解压后覆盖配置:
+cp E:/project/test_ERP_system/nginx.conf /c/nginx/nginx-1.30.2/conf/nginx.conf
+/c/nginx/nginx-1.30.2/nginx.exe -p /c/nginx/nginx-1.30.2/
+
+# 重新加载配置（不中断服务）: /c/nginx/nginx-1.30.2/nginx.exe -s reload
+# 停止: /c/nginx/nginx-1.30.2/nginx.exe -s stop
+```
+
+**生产模式访问**: `http://localhost` (80 端口，无需加端口号)
+
 登录账号: `admin` / `admin123`
+
+### Docker 部署模式 (交付/跨平台部署)
+
+三容器架构: `erp-frontend` (nginx:alpine) → `/api` 反向代理 → `erp-backend` (Spring Boot) → `erp-mysql` (MySQL 8.4)
+
+**docker/ 目录结构:**
+
+| 文件 | 说明 |
+|------|------|
+| `docker/.env` | 环境变量 (数据库密码、JWT密钥、端口) |
+| `docker/docker-compose.yml` | 三容器编排 (MySQL healthcheck + depends_on) |
+| `docker/init.sql` | 数据库初始化 (19张表按依赖顺序排列 + 种子数据) |
+| `docker/backend/Dockerfile` | 后端镜像 (eclipse-temurin:17-jre-alpine) |
+| `docker/frontend/Dockerfile` | 前端镜像 (nginx:alpine) |
+| `docker/frontend/nginx.conf` | Docker 版 nginx 配置 (proxy_pass http://backend:8080) |
+| `docker/.dockerignore` | 构建排除项 |
+| `docker/DOCKER部署指南.md` | 完整部署指南 (打包/部署/配置/常见问题) |
+
+**打包 (开发电脑):**
+
+```bash
+# 1. 后端 jar
+cd erp-backend && mvn clean package -DskipTests
+
+# 2. 前端 dist
+cd erp-frontend && npm run build
+
+# 3. 构建 Docker 镜像
+docker build -t erp-backend:1.0.0 -f docker/backend/Dockerfile .
+docker build -t erp-frontend:1.0.0 -f docker/frontend/Dockerfile .
+
+# 4. 导出镜像 + 交付物打包
+docker save -o erp-images.tar erp-backend:1.0.0 erp-frontend:1.0.0
+```
+
+**部署 (目标电脑):**
+
+```bash
+docker load -i erp-images.tar
+docker compose up -d
+# 访问 http://localhost, 账号 admin / admin123
+```
+
+- MySQL 数据持久化在 Docker 命名卷 `mysql-data`，`docker compose down` 不会丢失数据
+- `docker compose down -v` 会删除所有数据，谨慎执行
+- 详细说明: `docker/DOCKER部署指南.md` / `Docker打包与部署说明.txt`
 
 ## Architecture
 
