@@ -20,8 +20,11 @@ public class SalesAccountController {
     private SalesAccountService salesAccountService;
 
     @GetMapping
-    public ApiResponse<List<SalesAccountRespDTO>> listAll(@RequestParam(required = false) String keyword) {
-        return ApiResponse.success(salesAccountService.listAll(keyword));
+    public ApiResponse<List<SalesAccountRespDTO>> listAll(
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) String accountName,
+            @RequestParam(required = false) String displayName) {
+        return ApiResponse.success(salesAccountService.listAll(keyword, accountName, displayName));
     }
 
     @GetMapping("/my-accounts")

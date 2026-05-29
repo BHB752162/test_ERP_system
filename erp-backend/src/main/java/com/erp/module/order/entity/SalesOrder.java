@@ -55,6 +55,9 @@ public class SalesOrder {
 
     private Long updatedBy;
 
+    @Version
+    private Integer version;
+
     @TableField(exist = false)
     private String customerName;
 

@@ -73,6 +73,12 @@ const routes = [
         component: () => import('../views/order/OrderDetail.vue'),
         meta: { title: '订单详情' }
       },
+      {
+        path: 'orders/:orderId/tracking',
+        name: 'TrackingDetail',
+        component: () => import('../views/order/TrackingDetail.vue'),
+        meta: { title: '运单详情' }
+      },
 {
         path: 'users',
         name: 'UserList',
@@ -102,6 +108,12 @@ const routes = [
         name: 'TrackingImport',
         component: () => import('../views/admin-tools/TrackingImport.vue'),
         meta: { title: '运单号导入', roles: ['ADMIN'] }
+      },
+      {
+        path: 'payment-dashboard',
+        name: 'PaymentDashboard',
+        component: () => import('../views/payment-dashboard/PaymentDashboard.vue'),
+        meta: { title: '支付看板', roles: ['ADMIN'] }
       },
       {
         path: 'profile',

@@ -16,14 +16,19 @@
       </el-form-item>
 
       <el-form-item label="选择客户" prop="customerId">
-        <el-select v-model="form.customerId" placeholder="选择绑定的客户" filterable style="width: 100%" :disabled="!!orderId">
-          <el-option v-for="c in boundCustomers" :key="c.customerId" :value="c.customerId" :label="c.customerName" />
-        </el-select>
+        <div style="display: flex; gap: 8px; width: 100%">
+          <el-select v-model="form.customerId" placeholder="选择绑定的客户" filterable style="flex: 1" :disabled="!!orderId">
+            <el-option v-for="c in boundCustomers" :key="c.customerId" :value="c.customerId" :label="c.customerName" />
+          </el-select>
+          <el-button type="primary" plain @click="openCustomerCreate">
+            <el-icon style="margin-right: 4px"><Plus /></el-icon>新增顾客
+          </el-button>
+        </div>
         <div v-if="form.salesAccountId && !boundCustomers.length" style="color: #e6a23c; font-size: 12px; margin-top: 4px">该销售账户未绑定任何客户，请先在绑定管理中绑定</div>
       </el-form-item>
 
-      <el-form-item label="收件地址">
-        <el-select v-model="form.shippingAddressId" placeholder="选择收件地址" clearable filterable style="width: 100%" :disabled="!form.customerId">
+      <el-form-item label="收件地址" prop="shippingAddressId">
+        <el-select v-model="form.shippingAddressId" placeholder="请选择收件地址（必填）" filterable style="width: 100%" :disabled="!form.customerId">
           <el-option v-for="a in shippingAddresses" :key="a.id" :value="a.id" :label="`${a.recipientName} ${a.recipientPhone} - ${a.address.substring(0, 30)}${a.address.length > 30 ? '...' : ''}`">
             <span>{{ a.recipientName }}</span>
             <span style="color: #909399; margin-left: 4px">{{ a.recipientPhone }}</span>
@@ -31,6 +36,7 @@
             <el-tag v-if="a.isDefault" size="small" type="success" style="margin-left: 4px">默认</el-tag>
           </el-option>
         </el-select>
+        <div v-if="form.customerId && !shippingAddresses.length" style="color: #e6a23c; font-size: 12px; margin-top: 4px">该客户暂无收件地址，请在顾客详情中添加</div>
       </el-form-item>
 
       <el-form-item label="备注" prop="remark">
@@ -98,13 +104,15 @@
 </template>
 
 <script setup>
-import { ref, reactive, computed, watch } from 'vue'
+import { ref, reactive, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Delete } from '@element-plus/icons-vue'
 import { createDraft, submitOrder, updateOrder, getOrder, listAccountsForOrder, getBoundCustomers, listProductsForOrder } from '../../api/order'
 import { listShippingAddresses } from '../../api/customer'
 import { listChannelTypes } from '../../api/channelType'
 
+const router = useRouter()
 const visible = defineModel('visible', { type: Boolean, default: false })
 const props = defineProps({
   orderId: { type: Number, default: null }
@@ -132,7 +140,8 @@ const form = reactive({
 
 const rules = {
   salesAccountId: [{ required: true, message: '请选择销售账户', trigger: 'change' }],
-  customerId: [{ required: true, message: '请选择客户', trigger: 'change' }]
+  customerId: [{ required: true, message: '请选择客户', trigger: 'change' }],
+  shippingAddressId: [{ required: true, message: '请选择收件地址', trigger: 'change' }]
 }
 
 const totalAmount = computed(() => {
@@ -258,6 +267,24 @@ function onQtyChange(index) {
   }
 }
 
+function openCustomerCreate() {
+  const routeData = router.resolve({ path: '/customers/create', query: { from: 'order' } })
+  window.open(routeData.href, '_blank')
+}
+
+function onCustomerCreated(event) {
+  if (event.data?.type !== 'customer-created' || !event.data?.customerId) return
+  if (!form.salesAccountId) return
+  // 刷新绑定客户列表并自动选中新顾客
+  getBoundCustomers(form.salesAccountId).then(res => {
+    boundCustomers.value = res.data || []
+    form.customerId = event.data.customerId
+  })
+}
+
+onMounted(() => window.addEventListener('message', onCustomerCreated))
+onUnmounted(() => window.removeEventListener('message', onCustomerCreated))
+
 async function handleSubmit(action) {
   if (!form.items.length) {
     ElMessage.warning('请至少添加一个产品')
@@ -280,7 +307,7 @@ async function handleSubmit(action) {
     const data = {
       salesAccountId: form.salesAccountId,
       customerId: form.customerId,
-      shippingAddressId: form.shippingAddressId || null,
+      shippingAddressId: form.shippingAddressId,
       remark: form.remark,
       tag: form.tag || '',
       mallOrderInfo: form.mallOrderInfo || '',

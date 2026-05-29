@@ -4,9 +4,11 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.erp.common.response.ApiResponse;
 import com.erp.common.response.PageResult;
 import com.erp.module.order.dto.OrderCreateReqDTO;
+import com.erp.module.order.dto.OrderQueryDTO;
 import com.erp.module.order.dto.OrderRespDTO;
 import com.erp.module.order.dto.TrackingImportReqDTO;
 import com.erp.module.order.entity.OrderTracking;
+import org.springframework.security.access.prepost.PreAuthorize;
 import com.erp.module.order.entity.SalesOrder;
 import com.erp.module.order.service.OrderService;
 import com.erp.security.SecurityUtils;
@@ -32,10 +34,10 @@ public class OrderController {
     public ApiResponse<PageResult<SalesOrder>> list(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(required = false) String status) {
+            OrderQueryDTO query) {
         Long userId = SecurityUtils.getCurrentUserId();
         String roleCode = SecurityUtils.getCurrentRoleCode();
-        IPage<SalesOrder> result = orderService.listOrders(page, pageSize, status, userId, roleCode);
+        IPage<SalesOrder> result = orderService.listOrders(page, pageSize, query, userId, roleCode);
         return ApiResponse.success(PageResult.of(result));
     }
 
@@ -100,6 +102,7 @@ public class OrderController {
     }
 
     @PostMapping("/import-tracking")
+    @PreAuthorize("hasRole('ADMIN')")
     public ApiResponse<Void> importTracking(@RequestBody List<TrackingImportReqDTO> data) {
         orderService.importTracking(data, SecurityUtils.getCurrentUserId());
         return ApiResponse.success();
@@ -110,14 +113,20 @@ public class OrderController {
         return ApiResponse.success(orderService.listTracking(id));
     }
 
+    @DeleteMapping("/tracking/{trackingId}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ApiResponse<Void> deleteTracking(@PathVariable Long trackingId) {
+        orderService.deleteTracking(trackingId, SecurityUtils.getCurrentUserId());
+        return ApiResponse.success();
+    }
+
     @GetMapping("/export")
     public ResponseEntity<byte[]> export(
             @RequestParam(defaultValue = "order") String mode,
-            @RequestParam(required = false) String keyword,
-            @RequestParam(required = false) String status) {
+            OrderQueryDTO query) {
         Long userId = SecurityUtils.getCurrentUserId();
         String roleCode = SecurityUtils.getCurrentRoleCode();
-        byte[] excelBytes = orderService.exportOrders(mode, keyword, status, userId, roleCode);
+        byte[] excelBytes = orderService.exportOrders(mode, query, userId, roleCode);
 
         String suffix = "product".equals(mode) ? "by_product" : "by_order";
         String filename = "orders_" + suffix + "_" + LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss")) + ".xlsx";

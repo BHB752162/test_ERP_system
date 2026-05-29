@@ -71,6 +71,11 @@ export function deleteShippingAddress(id) {
   return request.delete(`/customers/shipping-addresses/${id}`)
 }
 
+// Audit logs
+export function listAuditLogs(customerId) {
+  return request.get(`/customers/${customerId}/audit-logs`)
+}
+
 // Sales account binding
 export function getBoundAccounts(customerId) {
   return request.get(`/sales-bindings/bound-accounts?customerId=${customerId}`)

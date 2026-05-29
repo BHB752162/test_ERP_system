@@ -19,6 +19,7 @@ public class OrderCreateReqDTO {
 
     private String remark;
 
+    @NotNull(message = "收件地址不能为空")
     private Long shippingAddressId;
 
     @NotNull(message = "收款信息不能为空")

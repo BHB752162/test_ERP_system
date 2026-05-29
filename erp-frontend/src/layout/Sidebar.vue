@@ -4,7 +4,7 @@
       <div class="sidebar-logo-icon">
         <el-icon :size="22" color="#fff"><ShoppingCart /></el-icon>
       </div>
-      <span>电商ERP系统</span>
+      <span>时黛王妃业务系统</span>
     </div>
     <el-menu
       :default-active="route.path"
@@ -66,6 +66,10 @@
           <el-icon><Coin /></el-icon>
           <span>渠道类型</span>
         </el-menu-item>
+        <el-menu-item v-if="auth.hasAnyRole(['ADMIN'])" index="/payment-dashboard">
+          <el-icon><DataAnalysis /></el-icon>
+          <span>支付看板</span>
+        </el-menu-item>
         <el-menu-item v-if="auth.hasRole('ADMIN')" index="/users">
           <el-icon><UserFilled /></el-icon>
           <span>用户管理</span>
@@ -111,7 +115,7 @@ const openedMenus = computed(() => {
   if (path.startsWith('/orders')) return ['order']
   if (path.startsWith('/customers')) return ['customer']
   if (path.startsWith('/products')) return ['product']
-  if (path.startsWith('/channel-types') || path.startsWith('/users') || path.startsWith('/sales-accounts')) return ['system']
+  if (path.startsWith('/channel-types') || path.startsWith('/users') || path.startsWith('/sales-accounts') || path.startsWith('/payment-dashboard')) return ['system']
   if (path.startsWith('/audit')) return ['audit']
   if (path.startsWith('/admin-tools')) return ['admin-tools']
   return []

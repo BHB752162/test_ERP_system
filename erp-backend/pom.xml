@@ -15,7 +15,7 @@
     <artifactId>erp-system</artifactId>
     <version>1.0.0</version>
     <name>erp-system</name>
-    <description>电商ERP系统</description>
+    <description>时黛王妃业务系统</description>
 
     <properties>
         <java.version>17</java.version>

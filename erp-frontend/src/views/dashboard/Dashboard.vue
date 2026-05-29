@@ -47,7 +47,7 @@
         <el-card shadow="never">
           <template #header>
             <div class="flex-between">
-              <span>欢迎使用电商ERP系统</span>
+              <span>欢迎使用时黛王妃业务系统</span>
               <el-tag size="small" type="info" effect="plain">v1.0</el-tag>
             </div>
           </template>
@@ -65,7 +65,7 @@
             </p>
             <p>
               <el-icon style="margin-right: 6px; vertical-align: middle"><Tools /></el-icon>
-              <strong>系统功能：</strong>顾客管理 / 产品管理 / 订单管理 / 审批管理
+              <strong>系统功能：</strong>顾客管理 / 产品管理 / 订单管理 / 销售账户管理 / 支付看板 / 审批管理 / 用户管理
             </p>
           </div>
         </el-card>

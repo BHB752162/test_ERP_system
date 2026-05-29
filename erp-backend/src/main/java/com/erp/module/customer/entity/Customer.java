@@ -29,6 +29,12 @@ public class Customer {
 
     private Long createdBy;
 
+    @TableField(exist = false)
+    private String createdByName;
+
+    @TableField(exist = false)
+    private Integer orderCount;
+
     @TableField(fill = FieldFill.INSERT)
     private LocalDateTime createdAt;
 

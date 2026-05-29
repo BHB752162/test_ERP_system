@@ -107,7 +107,7 @@ docker compose up -d
 
 ### Backend Package Layout (`com.erp`)
 
-- **`common/`** — 全局配置: SecurityConfig (URL角色拦截), MyMetaObjectHandler (自动填充时间), GlobalExceptionHandler, ApiResponse/PageResult 统一响应
+- **`common/`** — 全局配置: SecurityConfig (URL角色拦截), MyMetaObjectHandler (自动填充时间), GlobalExceptionHandler, ApiResponse/PageResult 统一响应, MyBatisPlusConfig (分页插件 + 乐观锁插件)
 - **`security/`** — JWT认证: JwtUtil (生成/解析), JwtAuthenticationFilter (Bearer Token提取 + SecurityContext设置)
 - **`module/{module}/`** — 每个业务模块按包分层: `controller/` → `service/` → `mapper/` → `entity/` + `dto/`
 
@@ -310,6 +310,58 @@ customer ─1:N→ customer_shipping_address
 - **运单号删除**: ADMIN 可删除, 删除后重算剩余妥投金额 vs 收款, 自动调整订单状态(无记录则回退APPROVED)
 - **订单列表展示**: 订单列表 API 含运单信息, 前端展示运单号标签(洗护橙色/普通灰色) + 发货时间 + 妥投金额 + 产品名称×数量明细
 - **产品名称匹配**: 运单 SKU 明细通过 `product_code` 回查 `product` 表获取产品名称, 未匹配则回退显示 SKU 编码
+
+### 数据库约束 (37 个: 8 UNIQUE + 29 FOREIGN KEY)
+
+2026-05-29 完成约束全面加固，新增 3 个 UNIQUE + 7 个 FOREIGN KEY:
+
+**新增 UNIQUE 约束:**
+
+| 表 | 约束 | 说明 |
+|-----|------|------|
+| `sales_account` | `uk_account_name` | 账户名全局唯一 |
+| `customer` | `uk_wechat_account` | 微信号全局唯一（NULL 允许重复） |
+| `order_tracking` | `uk_order_tracking (order_id, tracking_no)` | 同一订单不能重复导入同运单号 |
+| `customer_shipping_address` | `uk_customer_default_address (default_marker)` | 虚拟生成列: `IF(is_default=1, customer_id, NULL)`，保证每客户最多一个默认地址 |
+
+**新增 FOREIGN KEY:**
+
+| 表 | 约束 | 引用 |
+|-----|------|------|
+| `sales_order` | `fk_order_sales_account` | `sales_account(id)` |
+| `sales_order` | `fk_order_shipping_address` | `customer_shipping_address(id)` |
+| `sales_order` | `fk_order_payment_channel_type` | `payment_channel_type(id)` |
+| `sales_order` | `fk_order_updated_by` | `sys_user(id)` |
+| `sales_account` | `fk_sales_account_created_by/updated_by` | `sys_user(id)` |
+| `product` | `fk_product_created_by/updated_by/parent` | `sys_user(id)` / `product(id)` |
+
+**迁移脚本:** `erp-backend/src/main/resources/db/migration_20260529.sql` (约束) + `migration_20260529_concurrency.sql` (version列+默认地址虚拟列)
+
+### 并发安全机制
+
+**乐观锁 (Optimistic Locking):**
+
+- `sales_order` 表新增 `version INT NOT NULL DEFAULT 0` 列，实体类 `SalesOrder.version` 标注 `@Version`
+- `MyBatisPlusConfig` 注册 `OptimisticLockerInnerInterceptor` 插件
+- `updateById` 自动生成 `UPDATE ... WHERE id=? AND version=?`，版本不匹配时影响 0 行
+- `OrderServiceImpl.updateOrderWithVersion()` 辅助方法检测 0 行 → 抛出 `BusinessException("订单已被其他操作修改，请刷新后重试")`
+- 覆盖 12 个调用点: `submitForApproval`, `approveOrder`, `rejectOrder`, `cancelOrder`, `shipOrder`, `deliverOrder`, `refundOrder`, `updateOrder`, `importTracking`(状态变更), `deleteTracking`(状态变更)
+
+**事务保护:**
+
+- `CustomerServiceImpl.update` 加 `@Transactional`，将 select→微信号校验→update→审计日志纳入同一事务，缩小竞态窗口
+- `BindingServiceImpl.create` 加 `@Transactional`，binding insert + audit log insert 原子化
+- `SalesAccountServiceImpl.create`、`CustomerServiceImpl.create`、`ProductServiceImpl.create` 加 `@Transactional`
+
+**DuplicateKeyException 兜底:**
+
+所有 create 方法的 `insert` 调用包裹 `try-catch(DuplicateKeyException)`，并发绕过应用层查重时给出友好中文提示而非原始 SQL 错误:
+- 销售账户名已存在 / 该微信号已被其他顾客使用 / 产品编码已存在 / 该顾客已绑定此销售账户
+
+**关键并发风险已知局限:**
+
+- 通用实体编辑 (顾客/产品/销售账户) 的 "selectById → 修改 → updateById" 模式仍未加乐观锁，两个操作员同时编辑同一实体时后保存者静默覆盖前者
+- 订单号生成 `synchronized` + `AtomicInteger` 仅在单实例部署安全，多实例需改用数据库序列
 
 ### API Response Format
 

@@ -7,6 +7,12 @@ spring:
     username: root
     password: root
     driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      maximum-pool-size: 30
+      minimum-idle: 10
+      connection-timeout: 5000
+      idle-timeout: 600000
+      max-lifetime: 1800000
   jackson:
     date-format: yyyy-MM-dd HH:mm:ss
     time-zone: Asia/Shanghai
@@ -25,5 +31,11 @@ jwt:
   expiration: 86400000
 
 logging:
+  file:
+    path: logs
+  logback:
+    rollingpolicy:
+      max-history: 30
   level:
-    com.erp: debug
+    com.erp: info
+    root: warn

@@ -8,7 +8,7 @@
         <div class="login-logo">
           <el-icon :size="28" color="#fff"><ShoppingCart /></el-icon>
         </div>
-        <h2>电商ERP系统</h2>
+        <h2>时黛王妃业务系统</h2>
         <p>登录您的账户以继续</p>
       </div>
       <div class="login-body">

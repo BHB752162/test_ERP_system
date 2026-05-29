@@ -4,10 +4,12 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.erp.common.response.ApiResponse;
 import com.erp.common.response.PageResult;
 import com.erp.module.customer.dto.CustomerContactReqDTO;
+import com.erp.module.customer.dto.CustomerQueryDTO;
 import com.erp.module.customer.dto.CustomerReqDTO;
 import com.erp.module.customer.dto.PaymentChannelReqDTO;
 import com.erp.module.customer.dto.ShippingAddressReqDTO;
 import com.erp.module.customer.entity.Customer;
+import com.erp.module.customer.entity.CustomerAuditLog;
 import com.erp.module.customer.entity.CustomerContact;
 import com.erp.module.customer.entity.CustomerPaymentChannel;
 import com.erp.module.customer.entity.CustomerShippingAddress;
@@ -30,10 +32,10 @@ public class CustomerController {
     public ApiResponse<PageResult<Customer>> list(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(required = false) String keyword) {
+            CustomerQueryDTO query) {
         Long userId = SecurityUtils.getCurrentUserId();
         String roleCode = SecurityUtils.getCurrentRoleCode();
-        IPage<Customer> result = customerService.listCustomers(page, pageSize, keyword, userId, roleCode);
+        IPage<Customer> result = customerService.listCustomers(page, pageSize, query, userId, roleCode);
         return ApiResponse.success(PageResult.of(result));
     }
 
@@ -50,8 +52,13 @@ public class CustomerController {
 
     @PutMapping("/{id}")
     public ApiResponse<Void> update(@PathVariable Long id, @Valid @RequestBody CustomerReqDTO req) {
-        customerService.update(id, req);
+        customerService.update(id, req, SecurityUtils.getCurrentUserId());
         return ApiResponse.success();
+    }
+
+    @GetMapping("/{id}/audit-logs")
+    public ApiResponse<List<CustomerAuditLog>> listAuditLogs(@PathVariable Long id) {
+        return ApiResponse.success(customerService.listAuditLogs(id));
     }
 
     @DeleteMapping("/{id}")

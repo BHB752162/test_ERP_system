@@ -76,3 +76,7 @@ export function importTracking(data) {
 export function listTracking(orderId) {
   return request.get(`/orders/${orderId}/tracking`)
 }
+
+export function deleteTracking(trackingId) {
+  return request.delete(`/orders/tracking/${trackingId}`)
+}

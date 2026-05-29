@@ -10,13 +10,17 @@ import com.erp.module.binding.entity.CustomerSalesAccountBinding;
 import com.erp.module.binding.mapper.CustomerSalesAccountBindingMapper;
 import com.erp.module.binding.service.BindingService;
 import com.erp.module.customer.entity.Customer;
+import com.erp.module.customer.entity.CustomerAuditLog;
+import com.erp.module.customer.mapper.CustomerAuditLogMapper;
 import com.erp.module.customer.mapper.CustomerMapper;
 import com.erp.module.salesaccount.entity.SalesAccount;
 import com.erp.module.salesaccount.entity.SalesAccountUserBinding;
 import com.erp.module.salesaccount.mapper.SalesAccountMapper;
 import com.erp.module.salesaccount.mapper.SalesAccountUserBindingMapper;
 import com.erp.security.SecurityUtils;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import javax.annotation.Resource;
 import java.util.List;
@@ -39,6 +43,9 @@ public class BindingServiceImpl implements BindingService {
     @Resource
     private CustomerMapper customerMapper;
 
+    @Resource
+    private CustomerAuditLogMapper customerAuditLogMapper;
+
     @Override
     public IPage<BindingRespDTO> listAll(Long salesAccountId, Long customerId, Integer page, Integer pageSize) {
         LambdaQueryWrapper<CustomerSalesAccountBinding> wrapper = new LambdaQueryWrapper<CustomerSalesAccountBinding>()
@@ -54,7 +61,8 @@ public class BindingServiceImpl implements BindingService {
     }
 
     @Override
-    public void create(BindingReqDTO req) {
+    @Transactional
+    public void create(BindingReqDTO req, Long operatorId) {
         // Check duplicate
         Long count = bindingMapper.selectCount(
                 new LambdaQueryWrapper<CustomerSalesAccountBinding>()
@@ -73,7 +81,23 @@ public class BindingServiceImpl implements BindingService {
         CustomerSalesAccountBinding binding = new CustomerSalesAccountBinding();
         binding.setSalesAccountId(req.getSalesAccountId());
         binding.setCustomerId(req.getCustomerId());
-        bindingMapper.insert(binding);
+        try {
+            bindingMapper.insert(binding);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("该顾客已绑定此销售账户");
+        }
+
+        // 记录日志
+        String accountLabel = account.getDisplayName() != null
+                ? account.getAccountName() + "(" + account.getDisplayName() + ")"
+                : account.getAccountName();
+        CustomerAuditLog log = new CustomerAuditLog();
+        log.setCustomerId(req.getCustomerId());
+        log.setAction("UPDATE");
+        log.setFieldName("绑定销售账户");
+        log.setNewValue("绑定: " + accountLabel);
+        log.setOperatorId(operatorId);
+        customerAuditLogMapper.insert(log);
     }
 
     @Override
@@ -91,12 +115,32 @@ public class BindingServiceImpl implements BindingService {
         }
 
         // Delegate to regular create
-        create(req);
+        create(req, currentUserId);
     }
 
     @Override
-    public void unbind(Long id) {
-        if (bindingMapper.deleteById(id) == 0) throw new BusinessException("绑定关系不存在");
+    public void unbind(Long id, Long operatorId) {
+        CustomerSalesAccountBinding binding = bindingMapper.selectById(id);
+        if (binding == null) throw new BusinessException("绑定关系不存在");
+
+        SalesAccount account = salesAccountMapper.selectById(binding.getSalesAccountId());
+        String accountLabel = "";
+        if (account != null) {
+            accountLabel = account.getDisplayName() != null
+                    ? account.getAccountName() + "(" + account.getDisplayName() + ")"
+                    : account.getAccountName();
+        }
+
+        bindingMapper.deleteById(id);
+
+        // 记录日志
+        CustomerAuditLog log = new CustomerAuditLog();
+        log.setCustomerId(binding.getCustomerId());
+        log.setAction("UPDATE");
+        log.setFieldName("解绑销售账户");
+        log.setOldValue("解绑: " + accountLabel);
+        log.setOperatorId(operatorId);
+        customerAuditLogMapper.insert(log);
     }
 
     @Override

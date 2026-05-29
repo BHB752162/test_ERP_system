@@ -7,7 +7,7 @@ import com.erp.module.product.entity.Product;
 import java.util.List;
 
 public interface ProductService {
-    IPage<Product> listProducts(int page, int pageSize, String keyword);
+    IPage<Product> listProducts(int page, int pageSize, String keyword, Integer status);
     Product getById(Long id);
     Long create(ProductReqDTO req);
     void update(Long id, ProductReqDTO req);

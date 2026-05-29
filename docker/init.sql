@@ -1,6 +1,6 @@
 -- ============================================
--- 时黛王妃业务系统 - 数据库初始化脚本
--- MySQL 8.4+
+-- 时黛王妃业务系统 — Docker 初始化脚本
+-- 表按依赖顺序排列，所有列直接在 CREATE TABLE 中定义
 -- ============================================
 
 CREATE DATABASE IF NOT EXISTS erp_db DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
@@ -9,8 +9,7 @@ USE erp_db;
 -- ============================================
 -- 1. 系统角色表
 -- ============================================
-DROP TABLE IF EXISTS sys_role;
-CREATE TABLE sys_role (
+CREATE TABLE IF NOT EXISTS sys_role (
     id          BIGINT          NOT NULL AUTO_INCREMENT,
     role_name   VARCHAR(50)     NOT NULL COMMENT '角色名称',
     role_code   VARCHAR(50)     NOT NULL COMMENT '角色编码 ADMIN/SALES_PERSON',
@@ -25,8 +24,7 @@ CREATE TABLE sys_role (
 -- ============================================
 -- 2. 系统用户表
 -- ============================================
-DROP TABLE IF EXISTS sys_user;
-CREATE TABLE sys_user (
+CREATE TABLE IF NOT EXISTS sys_user (
     id          BIGINT          NOT NULL AUTO_INCREMENT,
     username    VARCHAR(50)     NOT NULL COMMENT '用户名',
     password    VARCHAR(255)    NOT NULL COMMENT 'BCrypt加密密码',
@@ -44,16 +42,15 @@ CREATE TABLE sys_user (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='系统用户';
 
 -- ============================================
--- 3. 客户主数据表（原4）
+-- 3. 客户主数据表
 -- ============================================
-DROP TABLE IF EXISTS customer;
-CREATE TABLE customer (
+CREATE TABLE IF NOT EXISTS customer (
     id              BIGINT          NOT NULL AUTO_INCREMENT,
     customer_name   VARCHAR(200)    NOT NULL COMMENT '客户名称',
     phone           VARCHAR(20)     DEFAULT NULL COMMENT '联系电话',
     add_friend_time DATETIME        DEFAULT NULL COMMENT '加粉时间',
     birthday        VARCHAR(5)      DEFAULT NULL COMMENT '生日 MM-DD',
-    wechat_account  VARCHAR(100)   DEFAULT NULL COMMENT '微信号',
+    wechat_account  VARCHAR(100)    DEFAULT NULL COMMENT '微信号',
     level           TINYINT         NOT NULL DEFAULT 0 COMMENT '等级 0=普通 1=银卡 2=金卡 3=钻石',
     status          TINYINT         NOT NULL DEFAULT 1 COMMENT '0=停用 1=启用',
     remark          TEXT            DEFAULT NULL COMMENT '备注',
@@ -69,10 +66,9 @@ CREATE TABLE customer (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客户主数据';
 
 -- ============================================
--- 5. 付款渠道类型表（可管理）
+-- 4. 付款渠道类型表
 -- ============================================
-DROP TABLE IF EXISTS payment_channel_type;
-CREATE TABLE payment_channel_type (
+CREATE TABLE IF NOT EXISTS payment_channel_type (
     id          BIGINT          NOT NULL AUTO_INCREMENT,
     type_code   VARCHAR(50)     NOT NULL COMMENT '类型编码',
     type_name   VARCHAR(100)    NOT NULL COMMENT '类型名称',
@@ -86,21 +82,13 @@ CREATE TABLE payment_channel_type (
     UNIQUE KEY uk_type_code (type_code)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='付款渠道类型';
 
-INSERT INTO payment_channel_type (type_code, type_name, sort_order) VALUES
-('ALIPAY', '支付宝', 1),
-('WECHAT', '微信支付', 2),
-('BANK_CARD', '银行卡', 3),
-('CASH', '现金', 4),
-('OTHER', '其他', 5);
-
 -- ============================================
--- 6. 客户付款渠道表
+-- 5. 客户付款渠道表
 -- ============================================
-DROP TABLE IF EXISTS customer_payment_channel;
-CREATE TABLE customer_payment_channel (
+CREATE TABLE IF NOT EXISTS customer_payment_channel (
     id              BIGINT          NOT NULL AUTO_INCREMENT,
     customer_id     BIGINT          NOT NULL COMMENT '客户ID',
-    channel_type    VARCHAR(50)     NOT NULL COMMENT '渠道类型 ALIPAY/WECHAT/BANK_CARD/CASH/OTHER',
+    channel_type    VARCHAR(50)     NOT NULL COMMENT '渠道类型',
     channel_account VARCHAR(200)    DEFAULT NULL COMMENT '账号/卡号',
     account_name    VARCHAR(100)    DEFAULT NULL COMMENT '户名',
     bank_name       VARCHAR(200)    DEFAULT NULL COMMENT '开户行（银行卡时）',
@@ -114,10 +102,9 @@ CREATE TABLE customer_payment_channel (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客户付款渠道';
 
 -- ============================================
--- 7. 客户联系人表
+-- 6. 客户联系人表
 -- ============================================
-DROP TABLE IF EXISTS customer_contact;
-CREATE TABLE customer_contact (
+CREATE TABLE IF NOT EXISTS customer_contact (
     id              BIGINT          NOT NULL AUTO_INCREMENT,
     customer_id     BIGINT          NOT NULL COMMENT '客户ID',
     contact_name    VARCHAR(100)    NOT NULL COMMENT '联系人姓名',
@@ -134,10 +121,9 @@ CREATE TABLE customer_contact (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客户联系人';
 
 -- ============================================
--- 8. 产品表
+-- 7. 产品表
 -- ============================================
-DROP TABLE IF EXISTS product;
-CREATE TABLE product (
+CREATE TABLE IF NOT EXISTS product (
     id              BIGINT          NOT NULL AUTO_INCREMENT,
     product_name    VARCHAR(200)    NOT NULL COMMENT '产品名称',
     product_type    VARCHAR(20)     NOT NULL DEFAULT 'SINGLE' COMMENT 'SINGLE=单品 SET=套装',
@@ -155,14 +141,70 @@ CREATE TABLE product (
     PRIMARY KEY (id),
     UNIQUE KEY uk_product_code (product_code),
     KEY idx_status (status),
+    KEY idx_parent_id (parent_id),
     KEY idx_created_by (created_by),
     KEY idx_updated_by (updated_by),
     CONSTRAINT fk_product_created_by FOREIGN KEY (created_by) REFERENCES sys_user(id),
     CONSTRAINT fk_product_updated_by FOREIGN KEY (updated_by) REFERENCES sys_user(id),
     CONSTRAINT fk_product_parent FOREIGN KEY (parent_id) REFERENCES product(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='产品';
-DROP TABLE IF EXISTS sales_order;
-CREATE TABLE sales_order (
+
+-- ============================================
+-- 8. 销售账户表（必须在 customer_sales_account_binding 之前）
+-- ============================================
+CREATE TABLE IF NOT EXISTS sales_account (
+    id              BIGINT          NOT NULL AUTO_INCREMENT,
+    account_name    VARCHAR(100)    NOT NULL COMMENT '销售账户',
+    display_name    VARCHAR(200)    DEFAULT NULL COMMENT '销售账户名称',
+    account_type    VARCHAR(50)     NOT NULL DEFAULT 'WECHAT' COMMENT '账户类型',
+    status          TINYINT         NOT NULL DEFAULT 1 COMMENT '0=禁用 1=启用',
+    created_by      BIGINT          DEFAULT NULL COMMENT '创建人',
+    updated_by      BIGINT          DEFAULT NULL COMMENT '更新人',
+    created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_account_name (account_name),
+    KEY idx_created_by (created_by),
+    KEY idx_updated_by (updated_by),
+    CONSTRAINT fk_sales_account_created_by FOREIGN KEY (created_by) REFERENCES sys_user(id),
+    CONSTRAINT fk_sales_account_updated_by FOREIGN KEY (updated_by) REFERENCES sys_user(id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='销售账户';
+
+-- ============================================
+-- 9. 顾客-销售账户绑定关系表
+-- ============================================
+CREATE TABLE IF NOT EXISTS customer_sales_account_binding (
+    id               BIGINT NOT NULL AUTO_INCREMENT,
+    customer_id      BIGINT NOT NULL COMMENT '顾客ID',
+    sales_account_id BIGINT NOT NULL COMMENT '销售账户ID',
+    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_customer_sales_account (customer_id, sales_account_id),
+    KEY idx_customer_id (customer_id),
+    KEY idx_sales_account_id (sales_account_id),
+    CONSTRAINT fk_csab_customer FOREIGN KEY (customer_id) REFERENCES customer(id) ON DELETE CASCADE,
+    CONSTRAINT fk_csab_sales_account FOREIGN KEY (sales_account_id) REFERENCES sales_account(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='顾客-销售账户绑定关系';
+
+-- ============================================
+-- 10. 销售账户-用户绑定关系表
+-- ============================================
+CREATE TABLE IF NOT EXISTS sales_account_user_binding (
+    id              BIGINT NOT NULL AUTO_INCREMENT,
+    sales_account_id BIGINT NOT NULL COMMENT '销售账户ID',
+    user_id         BIGINT NOT NULL COMMENT '用户ID',
+    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_account_user (sales_account_id, user_id),
+    KEY idx_user_id (user_id),
+    CONSTRAINT fk_sa_binding_account FOREIGN KEY (sales_account_id) REFERENCES sales_account(id) ON DELETE CASCADE,
+    CONSTRAINT fk_sa_binding_user FOREIGN KEY (user_id) REFERENCES sys_user(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='销售账户-用户绑定关系';
+
+-- ============================================
+-- 11. 销售订单表
+-- ============================================
+CREATE TABLE IF NOT EXISTS sales_order (
     id              BIGINT          NOT NULL AUTO_INCREMENT,
     order_no        VARCHAR(50)     NOT NULL COMMENT '订单号',
     customer_id     BIGINT          NOT NULL COMMENT '客户ID',
@@ -171,8 +213,8 @@ CREATE TABLE sales_order (
     total_amount    DECIMAL(12,2)   NOT NULL DEFAULT 0.00 COMMENT '总金额',
     discount_amount DECIMAL(12,2)   NOT NULL DEFAULT 0.00 COMMENT '折扣金额',
     final_amount    DECIMAL(12,2)   NOT NULL DEFAULT 0.00 COMMENT '最终金额',
-    status          VARCHAR(30)     NOT NULL DEFAULT 'SAVED' COMMENT '状态 SAVED/PENDING_APPROVAL/APPROVED/SHIPPED/DELIVERED/REJECTED/CANCELLED',
-    tag             VARCHAR(30)     NOT NULL DEFAULT '' COMMENT '标签：空=无，DELAYED=延迟发货',
+    status          VARCHAR(30)     NOT NULL DEFAULT 'SAVED' COMMENT '状态',
+    tag             VARCHAR(30)     NOT NULL DEFAULT '' COMMENT '标签',
     mall_order_info VARCHAR(200)    DEFAULT '' COMMENT '关联商场订单信息',
     shipping_address_id BIGINT      DEFAULT NULL COMMENT '收件地址ID',
     recipient_name  VARCHAR(100)    DEFAULT NULL COMMENT '收件人姓名（快照）',
@@ -206,10 +248,9 @@ CREATE TABLE sales_order (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='销售订单';
 
 -- ============================================
--- 11. 订单行项目表
+-- 12. 订单行项目表
 -- ============================================
-DROP TABLE IF EXISTS sales_order_item;
-CREATE TABLE sales_order_item (
+CREATE TABLE IF NOT EXISTS sales_order_item (
     id              BIGINT          NOT NULL AUTO_INCREMENT,
     order_id        BIGINT          NOT NULL COMMENT '订单ID',
     product_id      BIGINT          NOT NULL COMMENT '产品ID',
@@ -226,13 +267,12 @@ CREATE TABLE sales_order_item (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单行项目';
 
 -- ============================================
--- 12. 订单审批日志表
+-- 13. 订单审批日志表
 -- ============================================
-DROP TABLE IF EXISTS order_audit_log;
-CREATE TABLE order_audit_log (
+CREATE TABLE IF NOT EXISTS order_audit_log (
     id              BIGINT          NOT NULL AUTO_INCREMENT,
     order_id        BIGINT          NOT NULL COMMENT '订单ID',
-    action          VARCHAR(30)     NOT NULL COMMENT '操作类型 SUBMIT/APPROVE/REJECT/CANCEL/COMPLETE',
+    action          VARCHAR(30)     NOT NULL COMMENT '操作类型',
     operator_id     BIGINT          NOT NULL COMMENT '操作人ID',
     comment         TEXT            DEFAULT NULL COMMENT '审批意见',
     operated_at     DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '操作时间',
@@ -244,10 +284,9 @@ CREATE TABLE order_audit_log (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单审批日志';
 
 -- ============================================
--- 13. 客户收件地址表
+-- 14. 客户收件地址表
 -- ============================================
-DROP TABLE IF EXISTS customer_shipping_address;
-CREATE TABLE customer_shipping_address (
+CREATE TABLE IF NOT EXISTS customer_shipping_address (
     id              BIGINT          NOT NULL AUTO_INCREMENT,
     customer_id     BIGINT          NOT NULL COMMENT '客户ID',
     recipient_name  VARCHAR(100)    NOT NULL COMMENT '收件人姓名',
@@ -265,65 +304,9 @@ CREATE TABLE customer_shipping_address (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='客户收件地址';
 
 -- ============================================
--- 14. 顾客-销售账户绑定关系表
+-- 15. 订单多收款渠道表
 -- ============================================
-DROP TABLE IF EXISTS customer_sales_account_binding;
-CREATE TABLE customer_sales_account_binding (
-    id               BIGINT NOT NULL AUTO_INCREMENT,
-    customer_id      BIGINT NOT NULL COMMENT '顾客ID',
-    sales_account_id BIGINT NOT NULL COMMENT '销售账户ID',
-    created_at       DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_customer_sales_account (customer_id, sales_account_id),
-    KEY idx_customer_id (customer_id),
-    KEY idx_sales_account_id (sales_account_id),
-    CONSTRAINT fk_csab_customer FOREIGN KEY (customer_id) REFERENCES customer(id) ON DELETE CASCADE,
-    CONSTRAINT fk_csab_sales_account FOREIGN KEY (sales_account_id) REFERENCES sales_account(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='顾客-销售账户绑定关系';
-
--- ============================================
--- 15. 销售账户表
--- ============================================
-DROP TABLE IF EXISTS sales_account;
-CREATE TABLE sales_account (
-    id              BIGINT          NOT NULL AUTO_INCREMENT,
-    account_name    VARCHAR(100)    NOT NULL COMMENT '销售账户',
-    display_name    VARCHAR(200)    DEFAULT NULL COMMENT '销售账户名称',
-    account_type    VARCHAR(50)     NOT NULL DEFAULT 'WECHAT' COMMENT '账户类型 WECHAT=微信',
-    status          TINYINT         NOT NULL DEFAULT 1 COMMENT '0=禁用 1=启用',
-    created_by      BIGINT          DEFAULT NULL COMMENT '创建人',
-    updated_by      BIGINT          DEFAULT NULL COMMENT '更新人',
-    created_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at      DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_account_name (account_name),
-    KEY idx_created_by (created_by),
-    KEY idx_updated_by (updated_by),
-    CONSTRAINT fk_sales_account_created_by FOREIGN KEY (created_by) REFERENCES sys_user(id),
-    CONSTRAINT fk_sales_account_updated_by FOREIGN KEY (updated_by) REFERENCES sys_user(id)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='销售账户';
-
--- ============================================
--- 16. 销售账户-用户绑定关系表
--- ============================================
-DROP TABLE IF EXISTS sales_account_user_binding;
-CREATE TABLE sales_account_user_binding (
-    id              BIGINT NOT NULL AUTO_INCREMENT,
-    sales_account_id BIGINT NOT NULL COMMENT '销售账户ID',
-    user_id         BIGINT NOT NULL COMMENT '用户ID',
-    created_at      DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    UNIQUE KEY uk_account_user (sales_account_id, user_id),
-    KEY idx_user_id (user_id),
-    CONSTRAINT fk_sa_binding_account FOREIGN KEY (sales_account_id) REFERENCES sales_account(id) ON DELETE CASCADE,
-    CONSTRAINT fk_sa_binding_user FOREIGN KEY (user_id) REFERENCES sys_user(id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='销售账户-用户绑定关系';
-
--- ============================================
--- 17. 订单多收款渠道表
--- ============================================
-DROP TABLE IF EXISTS sales_order_payment;
-CREATE TABLE sales_order_payment (
+CREATE TABLE IF NOT EXISTS sales_order_payment (
     id                       BIGINT          NOT NULL AUTO_INCREMENT,
     order_id                 BIGINT          NOT NULL COMMENT '订单ID',
     payment_channel_type_id  BIGINT          NOT NULL COMMENT '收款渠道类型ID',
@@ -336,23 +319,15 @@ CREATE TABLE sales_order_payment (
     CONSTRAINT fk_sop_channel_type FOREIGN KEY (payment_channel_type_id) REFERENCES payment_channel_type(id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单收款渠道明细';
 
--- 数据迁移：将现有单条收款记录转入新表
-INSERT INTO sales_order_payment (order_id, payment_channel_type_id, payment_amount)
-SELECT id, payment_channel_type_id, payment_amount
-FROM sales_order
-WHERE payment_channel_type_id IS NOT NULL;
-
 -- ============================================
--- 18. 订单运单号表（父子表：运单号 1:N SKU明细）
+-- 16. 订单运单号表
 -- ============================================
-DROP TABLE IF EXISTS order_tracking_item;
-DROP TABLE IF EXISTS order_tracking;
-CREATE TABLE order_tracking (
+CREATE TABLE IF NOT EXISTS order_tracking (
     id                BIGINT          NOT NULL AUTO_INCREMENT,
     order_id          BIGINT          NOT NULL COMMENT '订单ID',
     tracking_no       VARCHAR(100)    NOT NULL COMMENT '运单号',
-    shipment_type     VARCHAR(20)     DEFAULT NULL COMMENT '发货类型: WASH_CARE=洗护, 空=非洗护',
-    shipping_time     DATETIME        COMMENT '发货时间',
+    shipment_type     VARCHAR(20)     DEFAULT NULL COMMENT '发货类型',
+    shipping_time     DATETIME        DEFAULT NULL COMMENT '发货时间',
     delivery_amount   DECIMAL(12,2)   DEFAULT 0.00 COMMENT '妥投金额',
     created_at        DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -362,7 +337,10 @@ CREATE TABLE order_tracking (
     CONSTRAINT fk_tracking_order FOREIGN KEY (order_id) REFERENCES sales_order(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='订单运单号';
 
-CREATE TABLE order_tracking_item (
+-- ============================================
+-- 17. 运单号SKU明细表
+-- ============================================
+CREATE TABLE IF NOT EXISTS order_tracking_item (
     id                BIGINT          NOT NULL AUTO_INCREMENT,
     tracking_id       BIGINT          NOT NULL COMMENT '运单号ID',
     product_sku       VARCHAR(100)    NOT NULL COMMENT '产品SKU',
@@ -373,10 +351,9 @@ CREATE TABLE order_tracking_item (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='运单号SKU明细';
 
 -- ============================================
--- 19. 顾客修改日志表
+-- 18. 顾客修改日志表
 -- ============================================
-DROP TABLE IF EXISTS customer_audit_log;
-CREATE TABLE customer_audit_log (
+CREATE TABLE IF NOT EXISTS customer_audit_log (
     id              BIGINT          NOT NULL AUTO_INCREMENT,
     customer_id     BIGINT          NOT NULL COMMENT '顾客ID',
     action          VARCHAR(30)     NOT NULL COMMENT '操作类型 CREATE/UPDATE',
@@ -396,9 +373,15 @@ CREATE TABLE customer_audit_log (
 -- 种子数据
 -- ============================================
 
--- 插入角色
-INSERT INTO sys_role (role_name, role_code, description) VALUES
+-- 插入角色（如已存在则忽略）
+INSERT IGNORE INTO sys_role (role_name, role_code, description) VALUES
 ('管理员', 'ADMIN', '系统管理员，拥有所有权限'),
 ('销售人员', 'SALES_PERSON', '销售人员，可下单和管理自己的客户');
 
--- 注意：管理员账号由应用启动时的 DataInitializer 自动创建（admin/admin123）
+-- 插入收款渠道类型
+INSERT IGNORE INTO payment_channel_type (type_code, type_name, sort_order) VALUES
+('ALIPAY', '支付宝', 1),
+('WECHAT', '微信支付', 2),
+('BANK_CARD', '银行卡', 3),
+('CASH', '现金', 4),
+('OTHER', '其他', 5);

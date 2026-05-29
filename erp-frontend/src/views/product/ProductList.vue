@@ -3,7 +3,13 @@
     <el-card shadow="never" class="search-card">
       <el-form :model="query" inline>
         <el-form-item label="产品名称">
-          <el-input v-model="query.keyword" placeholder="名称/SKU" clearable @keyup.enter="search" />
+          <el-input v-model="query.keyword" placeholder="名称/SKU" clearable style="width: 160px" @keyup.enter="search" @clear="search" />
+        </el-form-item>
+        <el-form-item label="上下架状态">
+          <el-select v-model="query.status" placeholder="全部" clearable style="width: 120px" @change="search">
+            <el-option label="上架" :value="1" />
+            <el-option label="下架" :value="0" />
+          </el-select>
         </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="search" :loading="loading">查询</el-button>
@@ -22,7 +28,7 @@
       <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" style="margin-bottom: 16px" />
       <el-table :data="list" border stripe v-loading="loading">
         <template #empty>
-          <el-empty :description="error || (query.keyword ? '没有找到匹配的产品' : '暂无产品数据')" />
+          <el-empty :description="error || (hasActiveFilter ? '没有找到匹配的产品' : '暂无产品数据')" />
         </template>
         <el-table-column prop="id" label="ID" width="60" />
         <el-table-column prop="productCode" label="SKU" width="120" />
@@ -61,15 +67,17 @@
 </template>
 
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { listProducts, deleteProduct } from '../../api/product'
 import { useCrudList, useDeleteAction } from '../../composables/useCrudList'
 import { ENABLE_STATUS_MAP, PRODUCT_TYPE_MAP } from '../../constants'
 import Pagination from '../../components/Pagination.vue'
 import StatusTag from '../../components/StatusTag.vue'
 
-const { list, total, loading, error, query, fetchData, search, reset, onPageChange } = useCrudList(listProducts, { defaultQuery: { keyword: '' } })
+const { list, total, loading, error, query, fetchData, search, reset, onPageChange } = useCrudList(listProducts, { defaultQuery: { keyword: '', status: undefined } })
 const { handleDelete } = useDeleteAction(deleteProduct, fetchData)
+
+const hasActiveFilter = computed(() => !!(query.keyword || query.status != null))
 
 onMounted(fetchData)
 </script>

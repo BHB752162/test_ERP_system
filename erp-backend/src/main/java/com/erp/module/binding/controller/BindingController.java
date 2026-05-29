@@ -6,6 +6,7 @@ import com.erp.common.response.PageResult;
 import com.erp.module.binding.dto.BindingReqDTO;
 import com.erp.module.binding.dto.BindingRespDTO;
 import com.erp.module.binding.service.BindingService;
+import com.erp.security.SecurityUtils;
 import org.springframework.web.bind.annotation.*;
 
 import javax.annotation.Resource;
@@ -40,7 +41,7 @@ public class BindingController {
 
     @PostMapping
     public ApiResponse<Void> create(@Valid @RequestBody BindingReqDTO req) {
-        bindingService.create(req);
+        bindingService.create(req, SecurityUtils.getCurrentUserId());
         return ApiResponse.success();
     }
 
@@ -52,7 +53,7 @@ public class BindingController {
 
     @DeleteMapping("/{id}")
     public ApiResponse<Void> unbind(@PathVariable Long id) {
-        bindingService.unbind(id);
+        bindingService.unbind(id, SecurityUtils.getCurrentUserId());
         return ApiResponse.success();
     }
 }

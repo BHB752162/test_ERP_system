@@ -14,6 +14,7 @@ import com.erp.module.user.mapper.SysUserMapper;
 import com.erp.security.SecurityUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -39,13 +40,19 @@ public class SalesAccountServiceImpl implements SalesAccountService {
     private SalesAccountUserBindingMapper salesAccountUserBindingMapper;
 
     @Override
-    public List<SalesAccountRespDTO> listAll(String keyword) {
+    public List<SalesAccountRespDTO> listAll(String keyword, String accountName, String displayName) {
         LambdaQueryWrapper<SalesAccount> wrapper = new LambdaQueryWrapper<SalesAccount>()
                 .ne(SalesAccount::getStatus, 0)
                 .orderByDesc(SalesAccount::getCreatedAt);
         if (StringUtils.isNotBlank(keyword)) {
             wrapper.and(w -> w.like(SalesAccount::getAccountName, keyword)
                     .or().like(SalesAccount::getDisplayName, keyword));
+        }
+        if (StringUtils.isNotBlank(accountName)) {
+            wrapper.like(SalesAccount::getAccountName, accountName);
+        }
+        if (StringUtils.isNotBlank(displayName)) {
+            wrapper.like(SalesAccount::getDisplayName, displayName);
         }
         List<SalesAccount> list = salesAccountMapper.selectList(wrapper);
         return convertList(list);
@@ -59,14 +66,27 @@ public class SalesAccountServiceImpl implements SalesAccountService {
     }
 
     @Override
+    @Transactional
     public Long create(SalesAccountReqDTO req) {
+        if (StringUtils.isNotBlank(req.getAccountName())) {
+            Long count = salesAccountMapper.selectCount(
+                    new LambdaQueryWrapper<SalesAccount>()
+                            .eq(SalesAccount::getAccountName, req.getAccountName())
+                            .ne(SalesAccount::getStatus, 0));
+            if (count > 0) throw new BusinessException("销售账户名已存在: " + req.getAccountName());
+        }
         SalesAccount account = new SalesAccount();
         BeanUtils.copyProperties(req, account);
         if (account.getStatus() == null) account.setStatus(1);
         Long userId = SecurityUtils.getCurrentUserId();
+        if (userId == null) throw new BusinessException("无法获取当前用户信息");
         account.setCreatedBy(userId);
         account.setUpdatedBy(userId);
-        salesAccountMapper.insert(account);
+        try {
+            salesAccountMapper.insert(account);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("销售账户名已存在: " + req.getAccountName());
+        }
         return account.getId();
     }
 
@@ -74,6 +94,14 @@ public class SalesAccountServiceImpl implements SalesAccountService {
     public void update(Long id, SalesAccountReqDTO req) {
         SalesAccount account = salesAccountMapper.selectById(id);
         if (account == null) throw new BusinessException("销售账户不存在");
+        if (StringUtils.isNotBlank(req.getAccountName())
+                && !req.getAccountName().equals(account.getAccountName())) {
+            Long count = salesAccountMapper.selectCount(
+                    new LambdaQueryWrapper<SalesAccount>()
+                            .eq(SalesAccount::getAccountName, req.getAccountName())
+                            .ne(SalesAccount::getStatus, 0));
+            if (count > 0) throw new BusinessException("销售账户名已存在: " + req.getAccountName());
+        }
         BeanUtils.copyProperties(req, account);
         account.setUpdatedBy(SecurityUtils.getCurrentUserId());
         salesAccountMapper.updateById(account);

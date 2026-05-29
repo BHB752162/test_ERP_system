@@ -16,6 +16,7 @@ import com.erp.module.customer.mapper.CustomerMapper;
 import com.erp.module.customer.mapper.CustomerShippingAddressMapper;
 import com.erp.module.customer.mapper.PaymentChannelTypeMapper;
 import com.erp.module.order.dto.OrderCreateReqDTO;
+import com.erp.module.order.dto.OrderQueryDTO;
 import com.erp.module.order.dto.OrderRespDTO;
 import com.erp.module.order.dto.TrackingImportReqDTO;
 import com.erp.module.order.entity.OrderTracking;
@@ -113,26 +114,20 @@ public class OrderServiceImpl implements OrderService {
         return "B" + datePart + String.format("%06d", seq);
     }
 
-    @Override
-    public IPage<SalesOrder> listOrders(int page, int pageSize, String status, Long currentUserId, String roleCode) {
-        Page<SalesOrder> pageParam = new Page<>(page, pageSize);
-        LambdaQueryWrapper<SalesOrder> wrapper = new LambdaQueryWrapper<>();
+    /**
+     * 乐观锁更新订单，0行受影响表示并发冲突
+     */
+    private void updateOrderWithVersion(SalesOrder order) {
+        int rows = salesOrderMapper.updateById(order);
+        if (rows == 0) {
+            throw new BusinessException("订单已被其他操作修改，请刷新后重试");
+        }
+    }
 
-        if (!"ADMIN".equals(roleCode)) {
-            List<Long> accountIds = salesAccountUserBindingMapper.selectList(
-                    new LambdaQueryWrapper<SalesAccountUserBinding>()
-                            .eq(SalesAccountUserBinding::getUserId, currentUserId))
-                    .stream().map(SalesAccountUserBinding::getSalesAccountId)
-                    .collect(Collectors.toList());
-            if (accountIds.isEmpty()) {
-                wrapper.eq(SalesOrder::getId, -1L);
-            } else {
-                wrapper.in(SalesOrder::getSalesAccountId, accountIds);
-            }
-        }
-        if (status != null && !status.isEmpty()) {
-            wrapper.eq(SalesOrder::getStatus, status);
-        }
+    @Override
+    public IPage<SalesOrder> listOrders(int page, int pageSize, OrderQueryDTO query, Long currentUserId, String roleCode) {
+        Page<SalesOrder> pageParam = new Page<>(page, pageSize);
+        LambdaQueryWrapper<SalesOrder> wrapper = buildOrderQueryWrapper(query, currentUserId, roleCode);
         wrapper.orderByDesc(SalesOrder::getCreatedAt);
         IPage<SalesOrder> result = salesOrderMapper.selectPage(pageParam, wrapper);
 
@@ -218,15 +213,12 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // Set shipping address snapshot
-        if (req.getShippingAddressId() != null) {
-            CustomerShippingAddress addr = shippingAddressMapper.selectById(req.getShippingAddressId());
-            if (addr != null) {
-                order.setShippingAddressId(addr.getId());
-                order.setRecipientName(addr.getRecipientName());
-                order.setRecipientPhone(addr.getRecipientPhone());
-                order.setRecipientAddress(addr.getAddress());
-            }
-        }
+        CustomerShippingAddress addr = shippingAddressMapper.selectById(req.getShippingAddressId());
+        if (addr == null) throw new BusinessException("收件地址不存在");
+        order.setShippingAddressId(addr.getId());
+        order.setRecipientName(addr.getRecipientName());
+        order.setRecipientPhone(addr.getRecipientPhone());
+        order.setRecipientAddress(addr.getAddress());
 
         order.setTotalAmount(total);
         order.setDiscountAmount(BigDecimal.ZERO);
@@ -278,7 +270,7 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus("PENDING_APPROVAL");
         order.setSubmittedAt(LocalDateTime.now());
         order.setUpdatedBy(currentUserId);
-        salesOrderMapper.updateById(order);
+        updateOrderWithVersion(order);
         addAuditLog(orderId, "SUBMIT", currentUserId, null);
     }
 
@@ -292,7 +284,7 @@ public class OrderServiceImpl implements OrderService {
         order.setStatus("APPROVED");
         order.setApprovedAt(LocalDateTime.now());
         order.setUpdatedBy(currentUserId);
-        salesOrderMapper.updateById(order);
+        updateOrderWithVersion(order);
         addAuditLog(orderId, "APPROVE", currentUserId, comment);
     }
 
@@ -305,7 +297,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus("REJECTED");
         order.setUpdatedBy(currentUserId);
-        salesOrderMapper.updateById(order);
+        updateOrderWithVersion(order);
         addAuditLog(orderId, "REJECT", currentUserId, comment);
     }
 
@@ -320,7 +312,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus("CANCELLED");
         order.setUpdatedBy(currentUserId);
-        salesOrderMapper.updateById(order);
+        updateOrderWithVersion(order);
         addAuditLog(orderId, "CANCEL", currentUserId, null);
     }
 
@@ -333,7 +325,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus("SHIPPED");
         order.setUpdatedBy(currentUserId);
-        salesOrderMapper.updateById(order);
+        updateOrderWithVersion(order);
         addAuditLog(orderId, "SHIP", currentUserId, null);
     }
 
@@ -344,9 +336,24 @@ public class OrderServiceImpl implements OrderService {
         if (order == null) throw new BusinessException("订单不存在");
         if (!"SHIPPED".equals(order.getStatus())) throw new BusinessException("只有已发货的订单才能确认妥投");
 
+        // 校验妥投金额与收款金额一致
+        List<OrderTracking> trackings = orderTrackingMapper.selectList(
+                new LambdaQueryWrapper<OrderTracking>().eq(OrderTracking::getOrderId, orderId));
+        BigDecimal totalDelivery = trackings.stream()
+                .map(t -> t.getDeliveryAmount() != null ? t.getDeliveryAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        List<SalesOrderPayment> payments = salesOrderPaymentMapper.selectList(
+                new LambdaQueryWrapper<SalesOrderPayment>().eq(SalesOrderPayment::getOrderId, orderId));
+        BigDecimal totalPayment = payments.stream()
+                .map(p -> p.getPaymentAmount() != null ? p.getPaymentAmount() : BigDecimal.ZERO)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (totalDelivery.compareTo(totalPayment) != 0) {
+            throw new BusinessException("运单号妥投金额总数(" + totalDelivery + ")与收款金额(" + totalPayment + ")不一致，无法确认妥投");
+        }
+
         order.setStatus("DELIVERED");
         order.setUpdatedBy(currentUserId);
-        salesOrderMapper.updateById(order);
+        updateOrderWithVersion(order);
         addAuditLog(orderId, "DELIVER", currentUserId, null);
     }
 
@@ -361,7 +368,7 @@ public class OrderServiceImpl implements OrderService {
 
         order.setStatus("REFUNDED");
         order.setUpdatedBy(currentUserId);
-        salesOrderMapper.updateById(order);
+        updateOrderWithVersion(order);
         addAuditLog(orderId, "REFUND", currentUserId, comment);
     }
 
@@ -370,7 +377,7 @@ public class OrderServiceImpl implements OrderService {
     public void updateOrder(Long id, OrderCreateReqDTO req, Long currentUserId) {
         SalesOrder order = salesOrderMapper.selectById(id);
         if (order == null) throw new BusinessException("订单不存在");
-        if (!"SAVED".equals(order.getStatus()) && !"REJECTED".equals(order.getStatus())) {
+        if (!SecurityUtils.hasRole("ADMIN") && !"SAVED".equals(order.getStatus()) && !"REJECTED".equals(order.getStatus())) {
             throw new BusinessException("只有已保存或已驳回的订单才能编辑");
         }
 
@@ -397,20 +404,12 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // 收件地址快照
-        if (req.getShippingAddressId() != null) {
-            CustomerShippingAddress addr = shippingAddressMapper.selectById(req.getShippingAddressId());
-            if (addr != null) {
-                order.setShippingAddressId(addr.getId());
-                order.setRecipientName(addr.getRecipientName());
-                order.setRecipientPhone(addr.getRecipientPhone());
-                order.setRecipientAddress(addr.getAddress());
-            }
-        } else {
-            order.setShippingAddressId(null);
-            order.setRecipientName(null);
-            order.setRecipientPhone(null);
-            order.setRecipientAddress(null);
-        }
+        CustomerShippingAddress addr = shippingAddressMapper.selectById(req.getShippingAddressId());
+        if (addr == null) throw new BusinessException("收件地址不存在");
+        order.setShippingAddressId(addr.getId());
+        order.setRecipientName(addr.getRecipientName());
+        order.setRecipientPhone(addr.getRecipientPhone());
+        order.setRecipientAddress(addr.getAddress());
 
         // 更新主表字段
         order.setCustomerId(req.getCustomerId());
@@ -422,7 +421,7 @@ public class OrderServiceImpl implements OrderService {
         order.setDiscountAmount(BigDecimal.ZERO);
         order.setFinalAmount(total);
         order.setUpdatedBy(currentUserId);
-        salesOrderMapper.updateById(order);
+        updateOrderWithVersion(order);
 
         // 插入新的收款记录
         for (OrderCreateReqDTO.PaymentItemReqDTO paymentReq : req.getPayments()) {
@@ -448,6 +447,43 @@ public class OrderServiceImpl implements OrderService {
             item.setSubtotal(subtotal);
             salesOrderItemMapper.insert(item);
         }
+
+        // 如果已有运单号，校验妥投金额不超过新收款金额，并调整状态
+        List<OrderTracking> editTrackings = orderTrackingMapper.selectList(
+                new LambdaQueryWrapper<OrderTracking>().eq(OrderTracking::getOrderId, id));
+        if (!editTrackings.isEmpty()) {
+            BigDecimal totalDelivery = editTrackings.stream()
+                    .map(t -> t.getDeliveryAmount() != null ? t.getDeliveryAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            List<SalesOrderPayment> newPayments = salesOrderPaymentMapper.selectList(
+                    new LambdaQueryWrapper<SalesOrderPayment>().eq(SalesOrderPayment::getOrderId, id));
+            BigDecimal totalPayment = newPayments.stream()
+                    .map(p -> p.getPaymentAmount() != null ? p.getPaymentAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            if (totalDelivery.compareTo(totalPayment) > 0) {
+                throw new BusinessException("运单号妥投金额总数(" + totalDelivery
+                        + ")超过修改后的收款金额(" + totalPayment + ")，请先删除对应运单号或调整收款金额");
+            }
+
+            String previousStatus = order.getStatus();
+            if (totalDelivery.compareTo(totalPayment) == 0) {
+                if (!"DELIVERED".equals(order.getStatus())) {
+                    order.setStatus("DELIVERED");
+                }
+            } else {
+                if ("DELIVERED".equals(order.getStatus())) {
+                    order.setStatus("SHIPPED");
+                }
+            }
+            if (!order.getStatus().equals(previousStatus)) {
+                order.setUpdatedBy(currentUserId);
+                updateOrderWithVersion(order);
+            }
+        }
+
+        addAuditLog(order.getId(), "EDIT", currentUserId, null);
     }
 
     @Override
@@ -479,6 +515,18 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
+        // 校验所有 SKU 是否在系统中存在
+        Set<String> importSkus = data.stream()
+                .map(r -> r.getProductSku().trim())
+                .collect(Collectors.toSet());
+        Set<String> existingSkus = productMapper.selectList(
+                new LambdaQueryWrapper<Product>().in(Product::getProductCode, importSkus))
+                .stream().map(Product::getProductCode).collect(Collectors.toSet());
+        importSkus.removeAll(existingSkus);
+        if (!importSkus.isEmpty()) {
+            throw new BusinessException("以下产品SKU在系统中不存在，请检查：\n" + String.join("、", importSkus));
+        }
+
         // 按 (orderNo, trackingNo) 分组
         Map<String, Map<String, List<TrackingImportReqDTO>>> grouped = data.stream()
                 .collect(Collectors.groupingBy(
@@ -493,6 +541,7 @@ public class OrderServiceImpl implements OrderService {
         Map<String, SalesOrder> orderMap = orders.stream()
                 .collect(Collectors.toMap(SalesOrder::getOrderNo, o -> o));
 
+        // 第一轮：校验订单存在 + 状态合法
         for (String orderNo : orderNos) {
             SalesOrder order = orderMap.get(orderNo);
             if (order == null) {
@@ -502,7 +551,72 @@ public class OrderServiceImpl implements OrderService {
                     && !"DELIVERED".equals(order.getStatus())) {
                 throw new BusinessException("订单 " + orderNo + " 状态不允许导入运单号（仅已审批/已发货/已妥投）");
             }
+        }
 
+        // 查询已有运单号的妥投金额合计 + 收款金额合计，用于金额校验
+        List<Long> orderIdList = orders.stream().map(SalesOrder::getId).collect(Collectors.toList());
+
+        List<OrderTracking> existingTrackings = orderTrackingMapper.selectList(
+                new LambdaQueryWrapper<OrderTracking>().in(OrderTracking::getOrderId, orderIdList));
+        Map<Long, BigDecimal> existingDeliveryByOrder = existingTrackings.stream()
+                .collect(Collectors.groupingBy(OrderTracking::getOrderId,
+                        Collectors.reducing(BigDecimal.ZERO,
+                                t -> t.getDeliveryAmount() != null ? t.getDeliveryAmount() : BigDecimal.ZERO,
+                                BigDecimal::add)));
+
+        // 校验运单号是否已存在（防止 uk_order_tracking 约束冲突）
+        Map<Long, Set<String>> existingTrackingNosByOrder = existingTrackings.stream()
+                .collect(Collectors.groupingBy(OrderTracking::getOrderId,
+                        Collectors.mapping(OrderTracking::getTrackingNo, Collectors.toSet())));
+        for (String orderNo : orderNos) {
+            SalesOrder order = orderMap.get(orderNo);
+            Set<String> existingNos = existingTrackingNosByOrder.getOrDefault(order.getId(), Collections.emptySet());
+            for (String trackingNo : grouped.get(orderNo).keySet()) {
+                if (existingNos.contains(trackingNo)) {
+                    throw new BusinessException("订单 " + orderNo + " 已存在运单号: " + trackingNo);
+                }
+            }
+        }
+
+        List<SalesOrderPayment> allPayments = salesOrderPaymentMapper.selectList(
+                new LambdaQueryWrapper<SalesOrderPayment>().in(SalesOrderPayment::getOrderId, orderIdList));
+        Map<Long, BigDecimal> paymentByOrder = allPayments.stream()
+                .collect(Collectors.groupingBy(SalesOrderPayment::getOrderId,
+                        Collectors.reducing(BigDecimal.ZERO,
+                                p -> p.getPaymentAmount() != null ? p.getPaymentAmount() : BigDecimal.ZERO,
+                                BigDecimal::add)));
+
+        // 计算本次导入的新增妥投金额
+        Map<Long, BigDecimal> newDeliveryByOrder = new HashMap<>();
+        for (String orderNo : orderNos) {
+            SalesOrder order = orderMap.get(orderNo);
+            Map<String, List<TrackingImportReqDTO>> trackingGroups = grouped.get(orderNo);
+            BigDecimal newDelivery = BigDecimal.ZERO;
+            for (List<TrackingImportReqDTO> rows : trackingGroups.values()) {
+                BigDecimal amt = rows.get(0).getDeliveryAmount();
+                if (amt != null) {
+                    newDelivery = newDelivery.add(amt);
+                }
+            }
+            newDeliveryByOrder.put(order.getId(), newDelivery);
+        }
+
+        // 金额校验：妥投总额不能超过收款金额
+        for (String orderNo : orderNos) {
+            SalesOrder order = orderMap.get(orderNo);
+            BigDecimal existingDelivery = existingDeliveryByOrder.getOrDefault(order.getId(), BigDecimal.ZERO);
+            BigDecimal newDelivery = newDeliveryByOrder.getOrDefault(order.getId(), BigDecimal.ZERO);
+            BigDecimal totalPayment = paymentByOrder.getOrDefault(order.getId(), BigDecimal.ZERO);
+            BigDecimal newTotal = existingDelivery.add(newDelivery);
+            if (newTotal.compareTo(totalPayment) > 0) {
+                throw new BusinessException("订单 " + orderNo + " 的运单号妥投金额总数(" + newTotal
+                        + ")超过收款金额(" + totalPayment + ")，无法导入");
+            }
+        }
+
+        // 第二轮：创建运单号记录并更新状态
+        for (String orderNo : orderNos) {
+            SalesOrder order = orderMap.get(orderNo);
             Map<String, List<TrackingImportReqDTO>> trackingGroups = grouped.get(orderNo);
             for (Map.Entry<String, List<TrackingImportReqDTO>> entry : trackingGroups.entrySet()) {
                 String trackingNo = entry.getKey();
@@ -538,11 +652,25 @@ public class OrderServiceImpl implements OrderService {
                 }
             }
 
-            // 仅 APPROVED → SHIPPED，已是 SHIPPED/DELIVERED 的不重复改状态
-            if ("APPROVED".equals(order.getStatus())) {
+            // 根据妥投金额 vs 收款金额更新状态
+            BigDecimal existingDelivery = existingDeliveryByOrder.getOrDefault(order.getId(), BigDecimal.ZERO);
+            BigDecimal newDelivery = newDeliveryByOrder.getOrDefault(order.getId(), BigDecimal.ZERO);
+            BigDecimal totalDelivery = existingDelivery.add(newDelivery);
+            BigDecimal totalPayment = paymentByOrder.getOrDefault(order.getId(), BigDecimal.ZERO);
+
+            String previousStatus = order.getStatus();
+            if (totalDelivery.compareTo(totalPayment) == 0) {
+                if (!"DELIVERED".equals(order.getStatus())) {
+                    order.setStatus("DELIVERED");
+                }
+            } else if ("APPROVED".equals(order.getStatus())) {
                 order.setStatus("SHIPPED");
+            } else if ("DELIVERED".equals(order.getStatus())) {
+                order.setStatus("SHIPPED");
+            }
+            if (!order.getStatus().equals(previousStatus)) {
                 order.setUpdatedBy(currentUserId);
-                salesOrderMapper.updateById(order);
+                updateOrderWithVersion(order);
             }
         }
 
@@ -566,6 +694,19 @@ public class OrderServiceImpl implements OrderService {
                     new LambdaQueryWrapper<OrderTrackingItem>().in(OrderTrackingItem::getTrackingId, trackingIds));
             Map<Long, List<OrderTrackingItem>> itemsMap = allItems.stream()
                     .collect(Collectors.groupingBy(OrderTrackingItem::getTrackingId));
+
+            // 回查产品名称
+            Set<String> skus = allItems.stream().map(OrderTrackingItem::getProductSku).collect(Collectors.toSet());
+            Map<String, String> skuNameMap = Collections.emptyMap();
+            if (!skus.isEmpty()) {
+                skuNameMap = productMapper.selectList(
+                        new LambdaQueryWrapper<Product>().in(Product::getProductCode, skus))
+                        .stream().collect(Collectors.toMap(Product::getProductCode, Product::getProductName, (a, b) -> a));
+            }
+            for (OrderTrackingItem item : allItems) {
+                item.setProductName(skuNameMap.getOrDefault(item.getProductSku(), item.getProductSku()));
+            }
+
             for (OrderTracking t : trackings) {
                 t.setItems(itemsMap.getOrDefault(t.getId(), Collections.emptyList()));
             }
@@ -574,8 +715,64 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
-    public byte[] exportOrders(String mode, String keyword, String status, Long currentUserId, String roleCode) {
-        List<SalesOrder> orders = queryFilteredOrders(keyword, status, currentUserId, roleCode);
+    @Transactional
+    public void deleteTracking(Long trackingId, Long currentUserId) {
+        OrderTracking tracking = orderTrackingMapper.selectById(trackingId);
+        if (tracking == null) {
+            throw new BusinessException("运单号记录不存在");
+        }
+
+        SalesOrder order = salesOrderMapper.selectById(tracking.getOrderId());
+        if (order == null) {
+            throw new BusinessException("关联订单不存在");
+        }
+
+        // 删除运单号（级联删除 SKU 明细）
+        orderTrackingMapper.deleteById(trackingId);
+
+        // 重新计算妥投金额 vs 收款金额，确定订单状态
+        List<OrderTracking> remainingTrackings = orderTrackingMapper.selectList(
+                new LambdaQueryWrapper<OrderTracking>().eq(OrderTracking::getOrderId, order.getId()));
+
+        if (remainingTrackings.isEmpty()) {
+            if ("SHIPPED".equals(order.getStatus()) || "DELIVERED".equals(order.getStatus())) {
+                order.setStatus("APPROVED");
+                order.setUpdatedBy(currentUserId);
+                updateOrderWithVersion(order);
+            }
+        } else {
+            BigDecimal totalDelivery = remainingTrackings.stream()
+                    .map(t -> t.getDeliveryAmount() != null ? t.getDeliveryAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            List<SalesOrderPayment> payments = salesOrderPaymentMapper.selectList(
+                    new LambdaQueryWrapper<SalesOrderPayment>().eq(SalesOrderPayment::getOrderId, order.getId()));
+            BigDecimal totalPayment = payments.stream()
+                    .map(p -> p.getPaymentAmount() != null ? p.getPaymentAmount() : BigDecimal.ZERO)
+                    .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+            String previousStatus = order.getStatus();
+            if (totalDelivery.compareTo(totalPayment) == 0) {
+                if (!"DELIVERED".equals(order.getStatus())) {
+                    order.setStatus("DELIVERED");
+                }
+            } else {
+                if ("DELIVERED".equals(order.getStatus())) {
+                    order.setStatus("SHIPPED");
+                }
+            }
+            if (!order.getStatus().equals(previousStatus)) {
+                order.setUpdatedBy(currentUserId);
+                updateOrderWithVersion(order);
+            }
+        }
+
+        addAuditLog(order.getId(), "DELETE_TRACKING", currentUserId, "删除运单号: " + tracking.getTrackingNo());
+    }
+
+    @Override
+    public byte[] exportOrders(String mode, OrderQueryDTO query, Long currentUserId, String roleCode) {
+        List<SalesOrder> orders = queryFilteredOrders(query, currentUserId, roleCode);
         if (orders.isEmpty()) {
             throw new BusinessException("没有匹配的订单数据可导出");
         }
@@ -619,8 +816,10 @@ public class OrderServiceImpl implements OrderService {
         return baos.toByteArray();
     }
 
-    private List<SalesOrder> queryFilteredOrders(String keyword, String status, Long currentUserId, String roleCode) {
+    private LambdaQueryWrapper<SalesOrder> buildOrderQueryWrapper(OrderQueryDTO query, Long currentUserId, String roleCode) {
         LambdaQueryWrapper<SalesOrder> wrapper = new LambdaQueryWrapper<>();
+
+        // 权限过滤：非管理员只看自己销售账户的订单
         if (!"ADMIN".equals(roleCode)) {
             List<Long> accountIds = salesAccountUserBindingMapper.selectList(
                     new LambdaQueryWrapper<SalesAccountUserBinding>()
@@ -633,12 +832,115 @@ public class OrderServiceImpl implements OrderService {
                 wrapper.in(SalesOrder::getSalesAccountId, accountIds);
             }
         }
-        if (status != null && !status.isEmpty()) {
-            wrapper.eq(SalesOrder::getStatus, status);
+
+        // 顾客ID精确匹配（从顾客页路由过来的筛选）
+        if (query.getCustomerId() != null) {
+            wrapper.eq(SalesOrder::getCustomerId, query.getCustomerId());
         }
-        if (keyword != null && !keyword.isEmpty()) {
-            wrapper.like(SalesOrder::getOrderNo, keyword);
+
+        // 订单号模糊查询
+        if (query.getOrderNo() != null && !query.getOrderNo().isEmpty()) {
+            wrapper.like(SalesOrder::getOrderNo, query.getOrderNo());
         }
+
+        // 客户名 → 先查 customer 表获取匹配的 customerId
+        if (query.getCustomerName() != null && !query.getCustomerName().isEmpty()) {
+            List<Long> customerIds = customerMapper.selectList(
+                    new LambdaQueryWrapper<Customer>()
+                            .like(Customer::getCustomerName, query.getCustomerName())
+                            .select(Customer::getId))
+                    .stream().map(Customer::getId).collect(Collectors.toList());
+            if (customerIds.isEmpty()) {
+                wrapper.eq(SalesOrder::getId, -1L);
+            } else {
+                wrapper.in(SalesOrder::getCustomerId, customerIds);
+            }
+        }
+
+        // 微信号 → 先查 customer 表
+        if (query.getWechatAccount() != null && !query.getWechatAccount().isEmpty()) {
+            List<Long> customerIds = customerMapper.selectList(
+                    new LambdaQueryWrapper<Customer>()
+                            .like(Customer::getWechatAccount, query.getWechatAccount())
+                            .select(Customer::getId))
+                    .stream().map(Customer::getId).collect(Collectors.toList());
+            if (customerIds.isEmpty()) {
+                wrapper.eq(SalesOrder::getId, -1L);
+            } else {
+                wrapper.in(SalesOrder::getCustomerId, customerIds);
+            }
+        }
+
+        // 销售姓名 → 先查 sys_user 表
+        if (query.getSalesPersonName() != null && !query.getSalesPersonName().isEmpty()) {
+            List<Long> userIds = sysUserMapper.selectList(
+                    new LambdaQueryWrapper<SysUser>()
+                            .like(SysUser::getRealName, query.getSalesPersonName())
+                            .select(SysUser::getId))
+                    .stream().map(SysUser::getId).collect(Collectors.toList());
+            if (userIds.isEmpty()) {
+                wrapper.eq(SalesOrder::getId, -1L);
+            } else {
+                wrapper.in(SalesOrder::getSalesPersonId, userIds);
+            }
+        }
+
+        // 销售账户 → 先模糊查销售账户名，再过滤
+        if (query.getSalesAccountName() != null && !query.getSalesAccountName().isEmpty()) {
+            List<Long> accountIds = salesAccountMapper.selectList(
+                    new LambdaQueryWrapper<SalesAccount>()
+                            .and(w -> w.like(SalesAccount::getAccountName, query.getSalesAccountName())
+                                      .or().like(SalesAccount::getDisplayName, query.getSalesAccountName())))
+                    .stream().map(SalesAccount::getId)
+                    .collect(Collectors.toList());
+            if (accountIds.isEmpty()) {
+                wrapper.eq(SalesOrder::getId, -1L);
+            } else {
+                wrapper.in(SalesOrder::getSalesAccountId, accountIds);
+            }
+        }
+
+        // 订单状态（精确匹配）
+        if (query.getStatus() != null && !query.getStatus().isEmpty()) {
+            wrapper.eq(SalesOrder::getStatus, query.getStatus());
+        }
+
+        // 订单标签（精确匹配）
+        if (query.getTag() != null && !query.getTag().isEmpty()) {
+            wrapper.eq(SalesOrder::getTag, query.getTag());
+        }
+
+        // 收件人姓名（模糊查询，直接在 sales_order 上）
+        if (query.getRecipientName() != null && !query.getRecipientName().isEmpty()) {
+            wrapper.like(SalesOrder::getRecipientName, query.getRecipientName());
+        }
+
+        // 收件人电话（模糊查询）
+        if (query.getRecipientPhone() != null && !query.getRecipientPhone().isEmpty()) {
+            wrapper.like(SalesOrder::getRecipientPhone, query.getRecipientPhone());
+        }
+
+        // 创建时间范围
+        if (query.getCreatedStart() != null) {
+            wrapper.ge(SalesOrder::getCreatedAt, query.getCreatedStart().atStartOfDay());
+        }
+        if (query.getCreatedEnd() != null) {
+            wrapper.le(SalesOrder::getCreatedAt, query.getCreatedEnd().plusDays(1).atStartOfDay());
+        }
+
+        // 提交审批时间范围
+        if (query.getSubmittedStart() != null) {
+            wrapper.ge(SalesOrder::getSubmittedAt, query.getSubmittedStart().atStartOfDay());
+        }
+        if (query.getSubmittedEnd() != null) {
+            wrapper.le(SalesOrder::getSubmittedAt, query.getSubmittedEnd().plusDays(1).atStartOfDay());
+        }
+
+        return wrapper;
+    }
+
+    private List<SalesOrder> queryFilteredOrders(OrderQueryDTO query, Long currentUserId, String roleCode) {
+        LambdaQueryWrapper<SalesOrder> wrapper = buildOrderQueryWrapper(query, currentUserId, roleCode);
         wrapper.orderByDesc(SalesOrder::getCreatedAt);
         return salesOrderMapper.selectList(wrapper);
     }

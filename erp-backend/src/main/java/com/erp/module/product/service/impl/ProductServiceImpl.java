@@ -13,6 +13,7 @@ import com.erp.module.user.mapper.SysUserMapper;
 import com.erp.security.SecurityUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.beans.BeanUtils;
+import org.springframework.dao.DuplicateKeyException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -31,14 +32,19 @@ public class ProductServiceImpl implements ProductService {
     private SysUserMapper sysUserMapper;
 
     @Override
-    public IPage<Product> listProducts(int page, int pageSize, String keyword) {
+    public IPage<Product> listProducts(int page, int pageSize, String keyword, Integer status) {
         Page<Product> pageParam = new Page<>(page, pageSize);
         LambdaQueryWrapper<Product> wrapper = new LambdaQueryWrapper<>();
         if (StringUtils.isNotBlank(keyword)) {
             wrapper.like(Product::getProductName, keyword)
                     .or().like(Product::getProductCode, keyword);
         }
-        wrapper.ne(Product::getStatus, 0).orderByDesc(Product::getCreatedAt);
+        if (status != null) {
+            wrapper.eq(Product::getStatus, status);
+        } else {
+            wrapper.ne(Product::getStatus, 0);
+        }
+        wrapper.orderByDesc(Product::getCreatedAt);
         IPage<Product> pageResult = productMapper.selectPage(pageParam, wrapper);
 
         // Batch load creator/updater names
@@ -80,15 +86,32 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    @Transactional
     public Long create(ProductReqDTO req) {
+        Long userId = SecurityUtils.getCurrentUserId();
+        if (userId == null) throw new BusinessException("无法获取当前用户信息");
+        if (StringUtils.isNotBlank(req.getProductCode())) {
+            Long count = productMapper.selectCount(
+                    new LambdaQueryWrapper<Product>()
+                            .eq(Product::getProductCode, req.getProductCode())
+                            .ne(Product::getStatus, 0));
+            if (count > 0) throw new BusinessException("产品编码已存在: " + req.getProductCode());
+        }
+        if (req.getParentId() != null) {
+            Product parent = productMapper.selectById(req.getParentId());
+            if (parent == null) throw new BusinessException("父产品不存在: " + req.getParentId());
+        }
         Product product = new Product();
         BeanUtils.copyProperties(req, product);
         if (product.getStatus() == null) product.setStatus(1);
         if (product.getStockQuantity() == null) product.setStockQuantity(0);
-        Long userId = SecurityUtils.getCurrentUserId();
         product.setCreatedBy(userId);
         product.setUpdatedBy(userId);
-        productMapper.insert(product);
+        try {
+            productMapper.insert(product);
+        } catch (DuplicateKeyException e) {
+            throw new BusinessException("产品编码已存在: " + req.getProductCode());
+        }
         return product.getId();
     }
 
@@ -96,6 +119,18 @@ public class ProductServiceImpl implements ProductService {
     public void update(Long id, ProductReqDTO req) {
         Product product = productMapper.selectById(id);
         if (product == null) throw new BusinessException("产品不存在");
+        if (StringUtils.isNotBlank(req.getProductCode())
+                && !req.getProductCode().equals(product.getProductCode())) {
+            Long count = productMapper.selectCount(
+                    new LambdaQueryWrapper<Product>()
+                            .eq(Product::getProductCode, req.getProductCode())
+                            .ne(Product::getStatus, 0));
+            if (count > 0) throw new BusinessException("产品编码已存在: " + req.getProductCode());
+        }
+        if (req.getParentId() != null && !req.getParentId().equals(product.getParentId())) {
+            Product parent = productMapper.selectById(req.getParentId());
+            if (parent == null) throw new BusinessException("父产品不存在: " + req.getParentId());
+        }
         BeanUtils.copyProperties(req, product);
         product.setUpdatedBy(SecurityUtils.getCurrentUserId());
         productMapper.updateById(product);

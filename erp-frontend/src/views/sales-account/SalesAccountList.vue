@@ -1,17 +1,33 @@
 <template>
-  <el-card shadow="never">
-    <template #header>
-      <div class="flex-between">
-        <span>销售账户管理</span>
-        <el-button type="primary" size="small" @click="showDialog(null)">
-          <el-icon style="margin-right: 4px"><Plus /></el-icon> 新增账户
-        </el-button>
-      </div>
-    </template>
+  <div>
+    <el-card shadow="never" class="search-card">
+      <el-form :model="query" inline>
+        <el-form-item label="销售账户">
+          <el-input v-model="query.accountName" placeholder="销售账户" clearable style="width: 160px" @keyup.enter="search" @clear="search" />
+        </el-form-item>
+        <el-form-item label="销售账户名称">
+          <el-input v-model="query.displayName" placeholder="销售账户名称" clearable style="width: 180px" @keyup.enter="search" @clear="search" />
+        </el-form-item>
+        <el-form-item>
+          <el-button type="primary" @click="search" :loading="loading">查询</el-button>
+          <el-button @click="reset">重置</el-button>
+        </el-form-item>
+      </el-form>
+    </el-card>
+
+    <el-card shadow="never" style="margin-top: 16px">
+      <template #header>
+        <div class="flex-between">
+          <span>销售账户管理</span>
+          <el-button type="primary" size="small" @click="showDialog(null)">
+            <el-icon style="margin-right: 4px"><Plus /></el-icon> 新增账户
+          </el-button>
+        </div>
+      </template>
     <el-alert v-if="error" :title="error" type="error" show-icon :closable="false" style="margin-bottom: 16px" />
     <el-table :data="list" border stripe v-loading="loading" row-key="id">
       <template #empty>
-        <el-empty :description="error || '暂无数据'" />
+        <el-empty :description="error || (hasActiveFilter ? '没有找到匹配的销售账户' : '暂无数据')" />
       </template>
       <el-table-column prop="id" label="ID" width="60" />
       <el-table-column prop="accountName" label="销售账户" min-width="150" />
@@ -93,6 +109,7 @@
       </template>
     </el-dialog>
   </el-card>
+  </div>
 </template>
 
 <script setup>
@@ -111,6 +128,10 @@ const formRef = ref(null)
 const dialogVisible = ref(false)
 const isEdit = ref(false)
 const editId = ref(null)
+
+// 搜索条件
+const query = reactive({ accountName: '', displayName: '' })
+const hasActiveFilter = computed(() => !!(query.accountName || query.displayName))
 
 // 用户绑定相关
 const allUsers = ref([])
@@ -145,13 +166,26 @@ async function fetchData() {
   loading.value = true
   error.value = ''
   try {
-    const res = await listSalesAccounts()
+    const params = {}
+    if (query.accountName) params.accountName = query.accountName
+    if (query.displayName) params.displayName = query.displayName
+    const res = await listSalesAccounts(params)
     list.value = res.data
   } catch (err) {
     error.value = err?.response?.data?.message || err?.message || '加载失败'
   } finally {
     loading.value = false
   }
+}
+
+function search() {
+  fetchData()
+}
+
+function reset() {
+  query.accountName = ''
+  query.displayName = ''
+  fetchData()
 }
 
 async function showDialog(row) {
@@ -254,3 +288,13 @@ async function handleDelete(id) {
 
 onMounted(fetchData)
 </script>
+
+<style scoped>
+.search-card :deep(.el-form-item) {
+  margin-bottom: 14px;
+  margin-right: 12px;
+}
+.search-card :deep(.el-form--inline .el-form-item) {
+  margin-bottom: 14px;
+}
+</style>

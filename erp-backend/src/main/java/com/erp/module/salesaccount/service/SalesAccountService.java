@@ -6,7 +6,7 @@ import com.erp.module.salesaccount.dto.SalesAccountRespDTO;
 import java.util.List;
 
 public interface SalesAccountService {
-    List<SalesAccountRespDTO> listAll(String keyword);
+    List<SalesAccountRespDTO> listAll(String keyword, String accountName, String displayName);
     SalesAccountRespDTO getById(Long id);
     Long create(SalesAccountReqDTO req);
     void update(Long id, SalesAccountReqDTO req);

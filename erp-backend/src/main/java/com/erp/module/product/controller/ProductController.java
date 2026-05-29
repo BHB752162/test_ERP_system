@@ -23,8 +23,9 @@ public class ProductController {
     public ApiResponse<PageResult<Product>> list(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int pageSize,
-            @RequestParam(required = false) String keyword) {
-        IPage<Product> result = productService.listProducts(page, pageSize, keyword);
+            @RequestParam(required = false) String keyword,
+            @RequestParam(required = false) Integer status) {
+        IPage<Product> result = productService.listProducts(page, pageSize, keyword, status);
         return ApiResponse.success(PageResult.of(result));
     }
 

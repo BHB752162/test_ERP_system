@@ -8,7 +8,7 @@
             <el-button type="primary" :loading="submitting" @click="handleSubmit">
               <el-icon style="margin-right: 4px"><Check /></el-icon>保存
             </el-button>
-            <el-button @click="$router.back()">
+            <el-button @click="goBack">
               <el-icon style="margin-right: 4px"><ArrowLeft /></el-icon>返回
             </el-button>
           </div>
@@ -268,13 +268,21 @@ async function submitBind() {
   if (!valid) return
   bindSubmitting.value = true
   try {
-    const account = availableAccounts.value.find(a => a.id === bindForm.salesAccountId)
-    if (!account) return
-    boundAccounts.value.push({
-      salesAccountId: account.id,
-      salesAccountName: account.accountName,
-      salesAccountDisplayName: account.displayName
-    })
+    if (isEdit.value) {
+      // Edit mode: call API immediately
+      await createSelfBinding({ salesAccountId: bindForm.salesAccountId, customerId: route.params.id })
+      ElMessage.success('绑定成功')
+      boundAccounts.value = (await getBoundAccounts(route.params.id)).data || []
+    } else {
+      // Create mode: save locally, will be created in handleSubmit
+      const account = availableAccounts.value.find(a => a.id === bindForm.salesAccountId)
+      if (!account) return
+      boundAccounts.value.push({
+        salesAccountId: account.id,
+        salesAccountName: account.accountName,
+        salesAccountDisplayName: account.displayName
+      })
+    }
     bindDialog.visible = false
   } finally {
     bindSubmitting.value = false
@@ -357,6 +365,14 @@ async function deleteAddress(row, index) {
   }
 }
 
+function goBack() {
+  if (route.query.from === 'order') {
+    window.close()
+  } else {
+    router.back()
+  }
+}
+
 // ===== Save =====
 async function handleSubmit() {
   const valid = await formRef.value.validate().catch(() => false)
@@ -397,6 +413,16 @@ async function handleSubmit() {
         })
       }
       ElMessage.success('创建成功')
+      // 如果是从订单创建页跳转过来的，通知父窗口并关闭
+      if (route.query.from === 'order' && window.opener) {
+        window.opener.postMessage({
+          type: 'customer-created',
+          customerId: newCustomerId,
+          customerName: form.customerName
+        }, window.location.origin)
+        window.close()
+        return
+      }
     }
     router.push('/customers')
   } catch { /* handled by interceptor */ }

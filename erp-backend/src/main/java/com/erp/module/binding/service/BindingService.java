@@ -8,9 +8,9 @@ import java.util.List;
 
 public interface BindingService {
     IPage<BindingRespDTO> listAll(Long salesAccountId, Long customerId, Integer page, Integer pageSize);
-    void create(BindingReqDTO req);
+    void create(BindingReqDTO req, Long operatorId);
     void createSelfBinding(BindingReqDTO req);
-    void unbind(Long id);
+    void unbind(Long id, Long operatorId);
     List<BindingRespDTO> listBoundCustomersByAccount(Long salesAccountId);
     List<BindingRespDTO> listBoundAccountsByCustomer(Long customerId);
 }
